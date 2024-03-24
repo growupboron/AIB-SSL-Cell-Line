@@ -32,6 +32,7 @@ class SimCLREncoder(nn.Module):
 def nt_xent_loss(z, tau=0.5):
     N = z.size(0) // 2
     device = z.device
+    print(device)
     cosine_sim = nn.CosineSimilarity(dim=2)
 
     z_expanded = z.unsqueeze(1).repeat(1, 2*N, 1)

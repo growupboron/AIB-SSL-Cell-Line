@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --partition=all_serial
+#SBATCH --partition=all_usr_prod
 #SBATCH --account=ai4bio2023
-#SBATCH --time=04:00:00
+#SBATCH --time=03:00:00
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4   # Number of tasks (GPUs) per node
 #SBATCH --nodes=1             # Number of nodes requested
@@ -11,7 +11,8 @@
 #SBATCH --mail-type=ALL
 
 # Train model
-python train_pl.py > logs/train_PL.log
+python -u train_pl.py > logs/train_PL.log
 # Eval Model
-python eval_pl.py > logs/test_PL.log
+python -u eval_pl.py > logs/test_PL.log
 
+#partition can be all_usr_prod or all_serial
