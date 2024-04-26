@@ -124,23 +124,28 @@ temperature = 0.5
 weight_decay = 1e-4
 # optimizer = torch.optim.ASGD(simclr_model.parameters(), lr=0.001, lambd=0.0001, alpha=0.75, t0=1000000.0, weight_decay=1e-4)
 
-def save_checkpoint(state, filename="simclr_checkpoint.pth.tar"):
-    torch.save(state, filename)
+def load_checkpoint(checkpoint_dir, model, optimizer):
+    try:
+        # Load the latest checkpoint
+        checkpoints = [chkpt for chkpt in os.listdir(checkpoint_dir) if chkpt.endswith('.pth.tar')]
+        if not checkpoints:
+            print("No checkpoints found at '{}', starting from scratch".format(checkpoint_dir))
+            return 0
+        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('_')[1].split('.')[0]))
+        latest_checkpoint_path = os.path.join(checkpoint_dir, latest_checkpoint)
 
-def load_checkpoint(checkpoint_path, model, optimizer):
-    if os.path.isfile(checkpoint_path):
-        print(f"Loading checkpoint '{checkpoint_path}'")
-        checkpoint = torch.load(checkpoint_path)
+        print(f"Loading checkpoint '{latest_checkpoint_path}'")
+        checkpoint = torch.load(latest_checkpoint_path)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        print(f"Loaded checkpoint '{checkpoint_path}' (epoch {checkpoint['epoch']})")
-        return checkpoint['epoch']
-    else:
-        print(f"No checkpoint found at '{checkpoint_path}'")
+        epoch = checkpoint['epoch']
+        print(f"Loaded checkpoint '{latest_checkpoint_path}' (epoch {epoch})")
+        return epoch
+    except Exception as e:
+        print(f"Error loading checkpoint: {e}")
         return 0
-checkpoint_path = "simclr_checkpoint.pth.tar"
-start_epoch = load_checkpoint(checkpoint_path, simclr_model, optimizer)
-print(start_epoch)
+
+checkpoint_dir = "./checkpoints/serial"
 
 def extract_features_and_labels(model, loader, verbose_every=500):
     print("Starting feature extraction...")
@@ -186,7 +191,10 @@ def evaluate_simclr(model, train_loader, test_loader, train_features, train_labe
     accuracy = accuracy_score(test_labels, predictions)
     print(f'Test Accuracy: {accuracy}')
 
+print(f'Starting extract_features_and_labels for train')
 features_extracted_train_features, features_extracted_train_labels = extract_features_and_labels(simclr_model,train_loader)
+
+print(f'Starting extract_features_and_labels for test')
 features_extracted_eval_features, features_extracted_eval_labels = extract_features_and_labels(simclr_model,eval_loader)
 
 evaluate_simclr(simclr_model,train_loader,eval_loader,features_extracted_train_features,features_extracted_train_labels,features_extracted_eval_features, features_extracted_eval_labels)

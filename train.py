@@ -7,6 +7,7 @@ import torch.nn as nn
 from wilds import get_dataset
 from wilds.common.data_loaders import get_train_loader, get_eval_loader
 import os
+from torch.utils.tensorboard import SummaryWriter
 
 dataset = get_dataset(dataset="rxrx1", download=False)
 train_data = dataset.get_subset(
@@ -131,33 +132,52 @@ classes_to_id = {
 # print(df["sirna_id"].value_counts())
 
 #!export CUDA_LAUNCH_BLOCKING=1
+#os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 # SSL training
 epochs = 20
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cuda")
 simclr_model = simclr_model.to(device)
 temperature = 0.5
 weight_decay = 1e-4
 # optimizer = torch.optim.ASGD(simclr_model.parameters(), lr=0.001, lambd=0.0001, alpha=0.75, t0=1000000.0, weight_decay=1e-4)
 
-def save_checkpoint(state, filename="simclr_checkpoint.pth.tar"):
-    torch.save(state, filename)
+def save_checkpoint(state, epoch, base_dir="./checkpoints/serial", filename="checkpoint_{epoch}.pth.tar"):
+    os.makedirs(base_dir, exist_ok=True)
+    filepath = os.path.join(base_dir, filename.format(epoch=epoch))
+    torch.save(state, filepath)
 
-def load_checkpoint(checkpoint_path, model, optimizer):
-    if os.path.isfile(checkpoint_path):
-        print(f"Loading checkpoint '{checkpoint_path}'")
-        checkpoint = torch.load(checkpoint_path)
+def load_checkpoint(checkpoint_dir, model, optimizer):
+    try:
+        # Load the latest checkpoint
+        checkpoints = [chkpt for chkpt in os.listdir(checkpoint_dir) if chkpt.endswith('.pth.tar')]
+        if not checkpoints:
+            print("No checkpoints found at '{}', starting from scratch".format(checkpoint_dir))
+            return 0
+        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('_')[1].split('.')[0]))
+        latest_checkpoint_path = os.path.join(checkpoint_dir, latest_checkpoint)
+
+        print(f"Loading checkpoint '{latest_checkpoint_path}'")
+        checkpoint = torch.load(latest_checkpoint_path)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        print(f"Loaded checkpoint '{checkpoint_path}' (epoch {checkpoint['epoch']})")
-        return checkpoint['epoch']
-    else:
-        print(f"No checkpoint found at '{checkpoint_path}'")
+        epoch = checkpoint['epoch']
+        print(f"Loaded checkpoint '{latest_checkpoint_path}' (epoch {epoch})")
+        return epoch
+    except Exception as e:
+        print(f"Error loading checkpoint: {e}")
         return 0
 
-checkpoint_path = "simclr_checkpoint.pth.tar"
-start_epoch = load_checkpoint(checkpoint_path, simclr_model, optimizer)
+checkpoint_dir = "./checkpoints/serial"
+
+# Initialize TensorBoard writer
+writer = SummaryWriter(log_dir='./tb_logs/serial')
+
+# Attempt to load the latest checkpoint
+start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
 
 simclr_model.train()
+
 for epoch in range(start_epoch, epochs):
     total_loss = 0
     for batch_idx, (images, _, _) in enumerate(train_loader):
@@ -175,10 +195,15 @@ for epoch in range(start_epoch, epochs):
         optimizer.step()
 
         total_loss += loss.item()
+
+        # Log loss to TensorBoard
+        writer.add_scalar('Loss/train', loss.item(), epoch * len(train_loader) + batch_idx)
+
         if batch_idx % 100 == 0:
             print(f'Epoch {epoch+1}, Batch {batch_idx+1}, Loss: {total_loss / (batch_idx + 1)}')
             save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': simclr_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
-            }, filename=checkpoint_path)
+            }, epoch, base_dir=checkpoint_dir)
+writer.close()

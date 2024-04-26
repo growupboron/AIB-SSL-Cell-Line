@@ -11,8 +11,6 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from data import RxRx1DataModule
 
-
-
 class SimCLREncoder(nn.Module):
     def __init__(self, base_model, out_features=4):
         super(SimCLREncoder, self).__init__()
@@ -96,11 +94,11 @@ def main():
     data_module = RxRx1DataModule(batch_size=75)
 
     model = SimCLRModule(learning_rate=3e-4, tau=0.5)
-    checkpoint_callback = ModelCheckpoint(dirpath="./checkpoints", monitor="train_loss", save_top_k=3, mode="min")
+    checkpoint_callback = ModelCheckpoint(dirpath="./checkpoints/parallel/", monitor="train_loss", save_top_k=3, mode="min")
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    logger = TensorBoardLogger("tb_logs", name="simclr")
+    logger = TensorBoardLogger("tb_logs/", name="parallel")
 
-    trainer = pl.Trainer(max_epochs=50, devices=3, callbacks=[checkpoint_callback, lr_monitor], logger=logger, precision='16-mixed')
+    trainer = pl.Trainer(max_epochs=50, devices=4, callbacks=[checkpoint_callback, lr_monitor], logger=logger, precision='16-mixed')
     trainer.fit(model, data_module)
 
 if __name__ == "__main__":

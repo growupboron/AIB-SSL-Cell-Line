@@ -35,7 +35,7 @@ def plot_confusion_matrix(conf_mat, class_names):
 def main():
     pl.seed_everything(42)
     # Load the trained model
-    model = SimCLRModule.load_from_checkpoint(checkpoint_path="checkpoints/last.ckpt")
+    model = SimCLRModule.load_from_checkpoint(checkpoint_path="checkpoints/parallel/last.ckpt")
     model.eval()
     model.freeze()
     

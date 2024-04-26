@@ -1,4 +1,5 @@
 __pycache__/
 AIB_env/
+AIB_env_serial/
 data/
 checkpoints/
