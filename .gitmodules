@@ -1,0 +1,3 @@
+[submodule "simclr-pytorch"]
+	path = simclr-pytorch
+	url = git@github.com:AndrewAtanov/simclr-pytorch.git
