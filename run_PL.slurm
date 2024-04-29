@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=all_usr_prod
 #SBATCH --account=ai4bio2023
-#SBATCH --time=03:00:00
+#SBATCH --time=06:00:00
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4   # Number of tasks (GPUs) per node
 #SBATCH --nodes=1             # Number of nodes requested

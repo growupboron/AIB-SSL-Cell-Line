@@ -98,7 +98,14 @@ def main():
     lr_monitor = LearningRateMonitor(logging_interval='step')
     logger = TensorBoardLogger("tb_logs/", name="parallel")
 
-    trainer = pl.Trainer(max_epochs=50, devices=4, callbacks=[checkpoint_callback, lr_monitor], logger=logger, precision='16-mixed')
+    #trainer = pl.Trainer(max_epochs=25, devices=2, callbacks=[checkpoint_callback, lr_monitor], logger=logger, precision='16-mixed')
+    trainer = pl.Trainer(
+    max_epochs=25,
+    devices=4,  # Number of devices
+    strategy='ddp',  # Explicitly specify the strategy if needed
+    callbacks=[checkpoint_callback, lr_monitor],
+    logger=logger,
+    precision='16-mixed')
     trainer.fit(model, data_module)
 
 if __name__ == "__main__":

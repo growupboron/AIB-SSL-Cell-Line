@@ -2,3 +2,4 @@
   warnings.warn(
 /work/cvcs_2023_group23/AIB/AIB_env_serial/AIB_env_serial/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=ResNet50_Weights.IMAGENET1K_V1`. You can also use `weights=ResNet50_Weights.DEFAULT` to get the most up-to-date weights.
   warnings.warn(msg)
+slurmstepd-ailb-login-02: error: *** JOB 2313025 ON ailb-login-02 CANCELLED AT 2024-04-26T07:30:23 ***
