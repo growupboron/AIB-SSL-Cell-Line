@@ -1,10 +1,6 @@
-# RXRX 256
-    # Mean: tensor([0.0232, 0.0618, 0.0403])
-    # Std: tensor([0.0266, 0.0484, 0.0210])
-
 # Training
+
 import os
-import PIL
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, Callback
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -27,31 +23,15 @@ class SaveLatestCheckpointCallback(Callback):
         """ Called when the train epoch ends. """
         trainer.save_checkpoint(self.file_path)
 
-class BatchNorm1dNoBias(nn.BatchNorm1d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bias.requires_grad = False
-
 class SimCLREncoder(nn.Module):
     def __init__(self, base_model, out_features=4):
         super(SimCLREncoder, self).__init__()
         self.base = nn.Sequential(*list(base_model.children())[:-1])  # Remove the original fc layer
-        #Resnet 18
         self.projection_head = nn.Sequential(
             nn.Linear(base_model.fc.in_features, 512),
-            nn.BatchNorm1d(512),
             nn.ReLU(inplace=True),
             nn.Linear(512, out_features),
-            BatchNorm1dNoBias(out_features)
         )
-        # #Resnet 50
-        # self.projection_head = nn.Sequential(
-        #     nn.Linear(base_model.fc.in_features, 2048),
-        #     nn.BatchNorm1d(2048),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(2048, out_features),
-        #     BatchNorm1dNoBias(out_features)
-        # )
 
     def forward(self, x):
         x = self.base(x)
@@ -81,45 +61,24 @@ def nt_xent_loss(z, tau=0.5):
 
     return loss
 
-def get_color_distortion():
-    # s is the strength of color distortion which is 1.0 here
-    # given from https://arxiv.org/pdf/2002.05709.pdf
-    s = 1.0
-    #color_jitter = transforms.ColorJitter(0.8, 0.8, 0.8, 0.2)
-    color_jitter = transforms.ColorJitter(0.8*s, 0.8*s, 0.8*s, 0.2)
-    rnd_color_jitter = transforms.RandomApply([color_jitter], p=0.8)
-    rnd_gray = transforms.RandomGrayscale(p=0.2)
-    color_distort = transforms.Compose([
-        rnd_color_jitter,
-        rnd_gray])
-    return color_distort
-
 class SimCLRModule(pl.LightningModule):
     def __init__(self, learning_rate=1e-3, tau=0.5):
         super(SimCLRModule, self).__init__()
         self.save_hyperparameters()
         base_model = models.resnet18(pretrained=True)
-        #base_model = models.ResNet50(pretrained=True)
         self.model = SimCLREncoder(base_model, out_features=4)
         self.tau = tau
         self.learning_rate = learning_rate
         self.t1 = transforms.Compose([
             transforms.ToPILImage(), 
-            #transforms.Resize((256, 256)),
-            #transforms.RandomCrop(175),
-            transforms.RandomResizedCrop(
-                    256,
-                    scale=(0.20, 1.0),
-                    interpolation=PIL.Image.BICUBIC,
-                ),
-            transforms.RandomHorizontalFlip(0.5),
+            transforms.Resize((256, 256)),
+            transforms.RandomCrop(175),
             transforms.ToTensor(),
         ])
         self.t2 = transforms.Compose([
             transforms.ToPILImage(), 
             transforms.Resize((256, 256)),
-            #transforms.RandomRotation(120),
-            get_color_distortion(),
+            transforms.RandomRotation(120),
             transforms.ToTensor()
         ])
 
@@ -143,6 +102,12 @@ class SimCLRModule(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
         return [optimizer], [scheduler]
     
+    # def predict_step(self, batch, batch_idx, dataloader_idx=None):
+    #     images, cell_type_ids, sirna_ids = batch  
+    #     images = images.to(self.device)
+    #     outputs = self(images)
+    #     return outputs, cell_type_ids, sirna_ids
+
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         images, cell_type_ids, sirna_ids = batch
         images = images.to(self.device)
