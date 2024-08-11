@@ -3,133 +3,36 @@ import torchvision
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 import torch.nn as nn
+from dataset import RxRx1Dataset
 from wilds import get_dataset
 from wilds.common.data_loaders import get_train_loader, get_eval_loader
 import os
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from train import SimCLREncoder, nt_xent_loss
+from torch.utils.data import random_split
 
-classes_to_id = {
-    0:"HUVEC",
-    1:"HEPG2",
-    2:"RPE",
-    3:"U2OS"
-}
 
-dataset = get_dataset(dataset="rxrx1", download=False)
-train_data = dataset.get_subset(
-    "train",
-    transform=transforms.Compose(
-        [transforms.Resize((256, 256)), transforms.ToTensor()]
-    ),
-)
-eval_data = dataset.get_subset(
-    "test",
-    transform=transforms.Compose(
-        [transforms.Resize((256, 256)), transforms.ToTensor()]
-    ),
-)
+def get_data_loaders():
+    generator = torch.Generator().manual_seed(42)
+    dataset = RxRx1Dataset(metadata_csv='metadata.csv', root_dir='/work/cvcs_2023_group23/AIB/data/rxrx1_v1.0', transform=transforms.Compose([transforms.CenterCrop(256), transforms.ToTensor(), transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))]))
+    total_size = len(dataset)
+    train_size = int(0.8 * total_size)
+    val_size = int(0.1 * total_size)
+    test_size = total_size - train_size - val_size
 
-# Prepare the standard data loader
-train_loader = get_train_loader("standard", train_data, batch_size=16)
-eval_loader = get_eval_loader(loader="standard", dataset=eval_data, batch_size=16)
+    train_set, val_set, test_set = random_split(dataset, [train_size, val_size, test_size], generator=generator)
 
-def nt_xent_loss(z, tau=0.5):
-    """
-    Computes the NT-Xent loss for a batch of embeddings using cosine similarity,
-    leveraging torch.nn.CosineSimilarity for efficient computation.
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=256, shuffle=True, num_workers=4)
+    eval_loader = torch.utils.data.DataLoader(test_set, batch_size=256, shuffle=True, num_workers=4)
+    return train_loader, eval_loader
 
-    Args:
-    - z: Concatenated embeddings of shape (2N, D) where N is the batch size and D is the embedding dimension.
-         This should contain pairs of embeddings (z_i, z_j) for positive samples concatenated along the first dimension.
-    - tau: The temperature scaling parameter.
 
-    Returns:
-    - The mean NT-Xent loss for the input batch.
-    """
-    N = z.size(0) // 2
-    device = z.device
-    cosine_sim = torch.nn.CosineSimilarity(dim=2)
-
-    # Expand z to (2N, 2N, D) by unsqueezing and repeating to compute all-vs-all cosine similarities
-    z_expanded = z.unsqueeze(1).repeat(1, 2*N, 1)
-    z_tiled = z.repeat(2*N, 1).view(2*N, 2*N, -1)
-
-    # Compute cosine similarity
-    sim = cosine_sim(z_expanded, z_tiled) / tau
-
-    # Mask to zero out similarities with themselves and compute softmax
-    mask = torch.eye(2*N, device=device).bool()
-    sim.masked_fill_(mask, float('-inf'))
-    sim_softmax = F.softmax(sim, dim=1)
-
-    # Create labels
-    labels = torch.arange(2*N, device=device)
-    labels = (labels + N) % (2*N)  # Shift labels to match positive pairs
-
-    # Gather the softmax probabilities of positive pairs
-    pos_probs = sim_softmax.gather(1, labels.view(-1, 1)).squeeze()
-
-    # Compute the NT-Xent loss
-    loss = -torch.log(pos_probs + 1e-9).mean()
-
-    return loss
-
-class SimCLREncoder(nn.Module):
-    def __init__(self, base_model, out_features):
-        super(SimCLREncoder, self).__init__()
-        self.base = nn.Sequential(*list(base_model.children())[:-1])  # Remove original fc layer
-        self.projection_head = nn.Sequential(
-            nn.Linear(base_model.fc.in_features, 512),
-            nn.ReLU(),
-            nn.Linear(512, out_features)
-        )
-
-    def forward(self, x):
-        x = self.base(x)
-        x = torch.flatten(x, 1)
-        x = self.projection_head(x)
-        return x
-
-# Define the augmentation pipeline
-def get_simclr_augmentation_pipeline(input_size=256, type=1):
-    return transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.RandomResizedCrop(size=input_size),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-    ]) if type == 1 else transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.RandomRotation(degrees=180),
-        transforms.RandomVerticalFlip(),
-        transforms.ColorJitter(0.8, 0.8, 0.8, 0.2),
-        transforms.GaussianBlur(kernel_size=int(0.1 * input_size)),
-        transforms.ToTensor(),
-    ])
-
-# Augmentation pipeline
-augmentation_pipeline1 = get_simclr_augmentation_pipeline()
-augmentation_pipeline2 = get_simclr_augmentation_pipeline(type=2)
-
-# Training setup
-base_model = torchvision.models.resnet50(pretrained=True)
-simclr_model = SimCLREncoder(base_model, out_features=4)
-optimizer = torch.optim.Adam(simclr_model.parameters(), lr=3e-4)
-
-epochs = 20
-device = torch.device("cuda")
-simclr_model = simclr_model.to(device)
-temperature = 0.5
-weight_decay = 1e-4
-# optimizer = torch.optim.ASGD(simclr_model.parameters(), lr=0.001, lambd=0.0001, alpha=0.75, t0=1000000.0, weight_decay=1e-4)
-
-def load_checkpoint(checkpoint_dir, model, optimizer):
+def load_checkpoint(checkpoint_dir, model, optimizer=None):
     try:
-        # Load the latest checkpoint
         checkpoints = [chkpt for chkpt in os.listdir(checkpoint_dir) if chkpt.endswith('.pth.tar')]
         if not checkpoints:
-            print("No checkpoints found at '{}', starting from scratch".format(checkpoint_dir))
+            print(f"No checkpoints found at '{checkpoint_dir}', starting from scratch")
             return 0
         latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('_')[1].split('.')[0]))
         latest_checkpoint_path = os.path.join(checkpoint_dir, latest_checkpoint)
@@ -137,7 +40,8 @@ def load_checkpoint(checkpoint_dir, model, optimizer):
         print(f"Loading checkpoint '{latest_checkpoint_path}'")
         checkpoint = torch.load(latest_checkpoint_path)
         model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        if optimizer:
+            optimizer.load_state_dict(checkpoint['optimizer'])
         epoch = checkpoint['epoch']
         print(f"Loaded checkpoint '{latest_checkpoint_path}' (epoch {epoch})")
         return epoch
@@ -145,26 +49,22 @@ def load_checkpoint(checkpoint_dir, model, optimizer):
         print(f"Error loading checkpoint: {e}")
         return 0
 
-checkpoint_dir = "./checkpoints/serial"
-
 def extract_features_and_labels(model, loader, verbose_every=500):
     print("Starting feature extraction...")
-    model.eval()  # Ensure the model is in evaluation mode
+    model.eval()
     features = []
     labels = []
-    device = next(model.parameters()).device  # Get the device of the model
+    device = next(model.parameters()).device
     batch_count = len(loader)
     with torch.no_grad():
         for i, (images, label, _) in enumerate(loader):
-            if i % verbose_every == 0:  # Conditionally print progress
+            if i % verbose_every == 0:
                 print(f"Processing batch {i+1}/{batch_count}...")
-            images = images.to(device)  # Move images to the device
+            images = images.to(device)
             output = model.base(images)
-            output = torch.flatten(output, start_dim=1)  # Keep on GPU
+            output = torch.flatten(output, start_dim=1)
             features.append(output)
-            labels.append(label.to(device))  # Keep labels on GPU if used later
-
-    # Concatenate all features and labels at once, then move to CPU if necessary
+            labels.append(label.to(device))
     features = torch.cat(features, dim=0).cpu().numpy()
     labels = torch.cat(labels, dim=0).cpu().numpy()
     print("Feature extraction completed. Processed total batches:", batch_count)
@@ -173,28 +73,29 @@ def extract_features_and_labels(model, loader, verbose_every=500):
 def evaluate_simclr(model, train_loader, test_loader, train_features, train_labels, test_features, test_labels):
     print("Model evaluation started.")
     model.eval()
-    #print("Extracting features and labels from training data...")
-    #train_features, train_labels = extract_features_and_labels(model, train_loader)
-    #print("Extracting features and labels from test data...")
-    #test_features, test_labels = extract_features_and_labels(model, test_loader)
-
-    # Train a classifier on the representations
-    print("Training the logistic regression classifier...")
     classifier = LogisticRegression(multi_class="multinomial", max_iter=1000, verbose=1, n_jobs=-1)
     classifier.fit(train_features, train_labels)
-
-    # Predict on the test set
-    print("Predicting on the test set...")
     predictions = classifier.predict(test_features)
-
-    # Compute accuracy
     accuracy = accuracy_score(test_labels, predictions)
     print(f'Test Accuracy: {accuracy}')
 
-print(f'Starting extract_features_and_labels for train')
-features_extracted_train_features, features_extracted_train_labels = extract_features_and_labels(simclr_model,train_loader)
+if __name__ == "__main__":
+    checkpoint_dir = "./checkpoints/parallel"
+    train_loader, eval_loader = get_data_loaders()
 
-print(f'Starting extract_features_and_labels for test')
-features_extracted_eval_features, features_extracted_eval_labels = extract_features_and_labels(simclr_model,eval_loader)
+    base_model = torchvision.models.resnet50(pretrained=True)
+    simclr_model = SimCLREncoder(base_model, out_features=4)
+    optimizer = torch.optim.SGD(simclr_model.parameters(), lr=1e-3, momentum=0.8)
 
-evaluate_simclr(simclr_model,train_loader,eval_loader,features_extracted_train_features,features_extracted_train_labels,features_extracted_eval_features, features_extracted_eval_labels)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    simclr_model = simclr_model.to(device)
+
+    start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
+
+    print(f'Starting feature extraction for train set')
+    train_features, train_labels = extract_features_and_labels(simclr_model, train_loader)
+
+    print(f'Starting feature extraction for test set')
+    test_features, test_labels = extract_features_and_labels(simclr_model, eval_loader)
+
+    evaluate_simclr(simclr_model, train_loader, eval_loader, train_features, train_labels, test_features, test_labels)

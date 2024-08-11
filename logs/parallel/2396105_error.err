@@ -1,0 +1,80 @@
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/__init__.py:11: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  if not hasattr(numpy, tp_name):
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/__init__.py:11: FutureWarning: In the future `np.bool` will be defined as the corresponding NumPy scalar.
+  if not hasattr(numpy, tp_name):
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/models/self_supervised/amdim/amdim_module.py:34: UnderReviewWarning: The feature generate_power_seq is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  "lr_options": generate_power_seq(LEARNING_RATE_CIFAR, 11),
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/models/self_supervised/amdim/amdim_module.py:92: UnderReviewWarning: The feature FeatureMapContrastiveTask is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  contrastive_task: Union[FeatureMapContrastiveTask] = FeatureMapContrastiveTask("01, 02, 11"),
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/losses/self_supervised_learning.py:228: UnderReviewWarning: The feature AmdimNCELoss is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  self.nce_loss = AmdimNCELoss(tclip)
+[rank: 0] Global seed set to 42
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and will be removed in 0.15, please use 'weights' instead.
+  warnings.warn(
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and will be removed in 0.15. The current behavior is equivalent to passing `weights=ResNet18_Weights.IMAGENET1K_V1`. You can also use `weights=ResNet18_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/torchvision/transforms/transforms.py:891: UserWarning: Argument 'interpolation' of type int is deprecated since 0.13 and will be removed in 0.15. Please use InterpolationMode enum.
+  warnings.warn(
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:106: UserWarning: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
+  rank_zero_warn("You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.")
+[rank: 0] Global seed set to 42
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
+Traceback (most recent call last):
+  File "/work/cvcs_2023_group23/AIB/train_pl.py", line 212, in <module>
+    main()
+  File "/work/cvcs_2023_group23/AIB/train_pl.py", line 208, in main
+    trainer.fit(model, data_module, ckpt_path=resume_from_checkpoint)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 608, in fit
+    call._call_and_handle_interrupt(
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 38, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 650, in _fit_impl
+    self._run(model, ckpt_path=self.ckpt_path)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1048, in _run
+    self.strategy.setup_environment()
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/strategies/ddp.py", line 152, in setup_environment
+    self.setup_distributed()
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/strategies/ddp.py", line 203, in setup_distributed
+    _init_dist_connection(self.cluster_environment, self._process_group_backend, timeout=self._timeout)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/lightning_fabric/utilities/distributed.py", line 245, in _init_dist_connection
+    torch.distributed.init_process_group(torch_distributed_backend, rank=global_rank, world_size=world_size, **kwargs)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/torch/distributed/distributed_c10d.py", line 627, in init_process_group
+    _store_based_barrier(rank, store, timeout)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/torch/distributed/distributed_c10d.py", line 255, in _store_based_barrier
+    raise RuntimeError(
+RuntimeError: Timed out initializing process group in store based barrier on rank: 0, for key: store_based_barrier_key:1 (world_size=4, worker_count=1, timeout=0:30:00)
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/__init__.py:11: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  if not hasattr(numpy, tp_name):
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/__init__.py:11: FutureWarning: In the future `np.bool` will be defined as the corresponding NumPy scalar.
+  if not hasattr(numpy, tp_name):
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/models/self_supervised/amdim/amdim_module.py:34: UnderReviewWarning: The feature generate_power_seq is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  "lr_options": generate_power_seq(LEARNING_RATE_CIFAR, 11),
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/models/self_supervised/amdim/amdim_module.py:92: UnderReviewWarning: The feature FeatureMapContrastiveTask is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  contrastive_task: Union[FeatureMapContrastiveTask] = FeatureMapContrastiveTask("01, 02, 11"),
+/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pl_bolts/losses/self_supervised_learning.py:228: UnderReviewWarning: The feature AmdimNCELoss is currently marked under review. The compatibility with other Lightning projects is not guaranteed and API may change at any time. The API and functionality may change without warning in future releases. More details: https://lightning-bolts.readthedocs.io/en/latest/stability.html
+  self.nce_loss = AmdimNCELoss(tclip)
+[rank: 0] Global seed set to 42
+Traceback (most recent call last):
+  File "/work/cvcs_2023_group23/AIB/eval_pl.py", line 103, in <module>
+    main()
+  File "/work/cvcs_2023_group23/AIB/eval_pl.py", line 44, in main
+    model = SimCLRModule.load_from_checkpoint(checkpoint_path="checkpoints/parallel/last.ckpt")
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/core/saving.py", line 139, in load_from_checkpoint
+    return _load_from_checkpoint(  # type: ignore[return-value]
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/pytorch_lightning/core/saving.py", line 160, in _load_from_checkpoint
+    checkpoint = pl_load(checkpoint_path, map_location=map_location)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/lightning_fabric/utilities/cloud_io.py", line 50, in _load
+    with fs.open(path_or_url, "rb") as f:
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/fsspec/spec.py", line 1293, in open
+    f = self._open(
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/fsspec/implementations/local.py", line 184, in _open
+    return LocalFileOpener(path, mode, fs=self, **kwargs)
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/fsspec/implementations/local.py", line 306, in __init__
+    self._open()
+  File "/work/cvcs_2023_group23/AIB/AIB_env/lib/python3.9/site-packages/fsspec/implementations/local.py", line 311, in _open
+    self.f = open(self.path, mode=self.mode)
+FileNotFoundError: [Errno 2] No such file or directory: '/work/cvcs_2023_group23/AIB/checkpoints/parallel/last.ckpt'

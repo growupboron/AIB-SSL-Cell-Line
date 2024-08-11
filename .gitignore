@@ -3,5 +3,4 @@ AIB_env/
 AIB_env_serial/
 data/
 checkpoints/
-models/
 simclr-pytorch/

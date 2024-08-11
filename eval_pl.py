@@ -9,6 +9,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from train_pl import SimCLRModule
 from dataset import RxRx1DataModule
+from datetime import datetime
+import os
 
 def plot_confusion_matrix(conf_mat, class_names):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -18,7 +20,12 @@ def plot_confusion_matrix(conf_mat, class_names):
     ax.set_title('Confusion Matrix')
     ax.set_xticklabels(class_names)
     ax.set_yticklabels(class_names)
-    fig.savefig("tb_logs/eval/confusion_matrix/tmp.png", dpi=fig.dpi)
+    # Generate a timestamp and format it as a string for unique filename
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"tb_logs/eval/confusion_matrix/confusion_matrix_{timestamp}.png"
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    fig.savefig(filename, dpi=fig.dpi)
 
 def main():
     pl.seed_everything(42)
@@ -28,7 +35,8 @@ def main():
     checkpoint_callback = ModelCheckpoint(dirpath="checkpoints/", save_top_k=1, verbose=True, monitor='val_loss', mode='min')
 
     # Initialize the data module
-    data_module = RxRx1DataModule(batch_size=512)
+    #data_module = RxRx1DataModule(batch_size=472)  #all_usr_prod
+    data_module = RxRx1DataModule(batch_size=128) #all_serial
     #data_module.setup(stage='fit')
     data_module.setup(stage='test')
 
@@ -40,23 +48,30 @@ def main():
     # Configure the Trainer
 
     trainer = pl.Trainer(
+        accelerator='gpu',
         devices=4,  # Specify the number of GPUs
         strategy='ddp',
         callbacks=[checkpoint_callback],
         logger=logger,
-        precision='16-mixed',
+        precision='32',
     )
 
     print("Starting feature extraction...")
-    output, cell_type_ids, sirna_ids = trainer.predict(model, dataloaders=data_module.test_dataloader())[0]
-    print(output.shape)
-    print(cell_type_ids.shape)
+    predlist = trainer.predict(model, dataloaders=data_module.test_dataloader())[0]
+    #print(predlist)
+    output, cell_type_ids, sirna_ids = predlist
+    #print(output.shape)
+    #print(cell_type_ids.shape)
     print("Features extracted.")
 
+    unique_classes, counts = torch.unique(cell_type_ids, return_counts=True)
+    print(f"Unique classes in cell_type_ids: {unique_classes}")
+    print(f"Counts for each class: {counts}")
+    
     # Reshaping it for fit
     features = output.reshape(-1, 1)
     labels = cell_type_ids.reshape(-1, 1)
-    
+    #print(features)
     print("Starting logistic regression training...")
     classifier = LogisticRegression(max_iter=1000, verbose=1, n_jobs=-1)
     #classifier = LogisticRegression(max_iter=2, verbose=1, n_jobs=-1)

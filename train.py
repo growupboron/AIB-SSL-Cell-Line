@@ -1,77 +1,61 @@
-# Load dataset
 import torch
 import torchvision
+from torch.utils.data import random_split
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 import torch.nn as nn
 from wilds import get_dataset
 from wilds.common.data_loaders import get_train_loader, get_eval_loader
+from tqdm import tqdm
 import os
 from torch.utils.tensorboard import SummaryWriter
+from dataset import RxRx1Dataset
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
-dataset = get_dataset(dataset="rxrx1", download=False)
-train_data = dataset.get_subset(
-    "train",
-    transform=transforms.Compose(
-        [transforms.Resize((256, 256)), transforms.ToTensor()]
-    ),
-)
-eval_data = dataset.get_subset(
-    "test",
-    transform=transforms.Compose(
-        [transforms.Resize((256, 256)), transforms.ToTensor()]
-    ),
-)
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
-# Prepare the standard data loader
-train_loader = get_train_loader("standard", train_data, batch_size=16)
-eval_loader = get_eval_loader(loader="standard", dataset=eval_data, batch_size=16)
+def cleanup():
+    dist.destroy_process_group()
+
+def get_data_loaders():
+    generator = torch.Generator().manual_seed(42)
+    dataset = RxRx1Dataset(metadata_csv='metadata.csv', root_dir='/work/cvcs_2023_group23/AIB/data/rxrx1_v1.0', transform=transforms.Compose([transforms.CenterCrop(256), transforms.ToTensor(), transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))]))
+    total_size = len(dataset)
+    train_size = int(0.8 * total_size)
+    val_size = int(0.1 * total_size)
+    test_size = total_size - train_size - val_size
+
+    train_set, val_set, test_set = random_split(dataset, [train_size, val_size, test_size], generator=generator)
+
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=256, shuffle=True, num_workers=4)
+    eval_loader = torch.utils.data.DataLoader(test_set, batch_size=256, shuffle=True, num_workers=4)
+    return train_loader, eval_loader
 
 def nt_xent_loss(z, tau=0.5):
-    """
-    Computes the NT-Xent loss for a batch of embeddings using cosine similarity,
-    leveraging torch.nn.CosineSimilarity for efficient computation.
-
-    Args:
-    - z: Concatenated embeddings of shape (2N, D) where N is the batch size and D is the embedding dimension.
-         This should contain pairs of embeddings (z_i, z_j) for positive samples concatenated along the first dimension.
-    - tau: The temperature scaling parameter.
-
-    Returns:
-    - The mean NT-Xent loss for the input batch.
-    """
     N = z.size(0) // 2
     device = z.device
     cosine_sim = torch.nn.CosineSimilarity(dim=2)
-
-    # Expand z to (2N, 2N, D) by unsqueezing and repeating to compute all-vs-all cosine similarities
     z_expanded = z.unsqueeze(1).repeat(1, 2*N, 1)
     z_tiled = z.repeat(2*N, 1).view(2*N, 2*N, -1)
-
-    # Compute cosine similarity
     sim = cosine_sim(z_expanded, z_tiled) / tau
-
-    # Mask to zero out similarities with themselves and compute softmax
     mask = torch.eye(2*N, device=device).bool()
     sim.masked_fill_(mask, float('-inf'))
     sim_softmax = F.softmax(sim, dim=1)
-
-    # Create labels
     labels = torch.arange(2*N, device=device)
-    labels = (labels + N) % (2*N)  # Shift labels to match positive pairs
-
-    # Gather the softmax probabilities of positive pairs
+    labels = (labels + N) % (2*N)
     pos_probs = sim_softmax.gather(1, labels.view(-1, 1)).squeeze()
-
-    # Compute the NT-Xent loss
     loss = -torch.log(pos_probs + 1e-9).mean()
-
     return loss
 
 class SimCLREncoder(nn.Module):
     def __init__(self, base_model, out_features):
         super(SimCLREncoder, self).__init__()
-        self.base = nn.Sequential(*list(base_model.children())[:-1])  # Remove original fc layer
+        self.base = nn.Sequential(*list(base_model.children())[:-1])
         self.projection_head = nn.Sequential(
             nn.Linear(base_model.fc.in_features, 512),
             nn.ReLU(),
@@ -84,7 +68,6 @@ class SimCLREncoder(nn.Module):
         x = self.projection_head(x)
         return x
 
-# Define the augmentation pipeline
 def get_simclr_augmentation_pipeline(input_size=256, type=1):
     return transforms.Compose([
         transforms.ToPILImage(),
@@ -96,51 +79,8 @@ def get_simclr_augmentation_pipeline(input_size=256, type=1):
         transforms.ToPILImage(),
         transforms.RandomRotation(degrees=180),
         transforms.RandomVerticalFlip(),
-        # transforms.ColorJitter(0.8, 0.8, 0.8, 0.2),
-        # transforms.GaussianBlur(kernel_size=int(0.1 * input_size)),
         transforms.ToTensor(),
     ])
-
-# Augmentation pipeline
-augmentation_pipeline1 = get_simclr_augmentation_pipeline()
-augmentation_pipeline2 = get_simclr_augmentation_pipeline(type=2)
-
-# Training setup
-base_model = torchvision.models.resnet50(pretrained=True)
-simclr_model = SimCLREncoder(base_model, out_features=4)
-optimizer = torch.optim.Adam(simclr_model.parameters(), lr=3e-4)
-
-# import pandas as pd
-# import numpy as np
-
-# df = pd.read_csv("/content/data/rxrx1_v1.0/metadata.csv")
-# df.head()
-
-# df.info()
-
-# print(df["cell_type"].value_counts()) # these are the 4 classes I think
-
-classes_to_id = {
-    0:"HUVEC",
-    1:"HEPG2",
-    2:"RPE",
-    3:"U2OS"
-}
-
-# print(df["sirna"].value_counts())
-
-# print(df["sirna_id"].value_counts())
-
-#!export CUDA_LAUNCH_BLOCKING=1
-#os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-# SSL training
-epochs = 20
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cuda")
-simclr_model = simclr_model.to(device)
-temperature = 0.5
-weight_decay = 1e-4
-# optimizer = torch.optim.ASGD(simclr_model.parameters(), lr=0.001, lambd=0.0001, alpha=0.75, t0=1000000.0, weight_decay=1e-4)
 
 def save_checkpoint(state, epoch, base_dir="./checkpoints/serial", filename="checkpoint_{epoch}.pth.tar"):
     os.makedirs(base_dir, exist_ok=True)
@@ -149,7 +89,6 @@ def save_checkpoint(state, epoch, base_dir="./checkpoints/serial", filename="che
 
 def load_checkpoint(checkpoint_dir, model, optimizer):
     try:
-        # Load the latest checkpoint
         checkpoints = [chkpt for chkpt in os.listdir(checkpoint_dir) if chkpt.endswith('.pth.tar')]
         if not checkpoints:
             print("No checkpoints found at '{}', starting from scratch".format(checkpoint_dir))
@@ -168,42 +107,48 @@ def load_checkpoint(checkpoint_dir, model, optimizer):
         print(f"Error loading checkpoint: {e}")
         return 0
 
-checkpoint_dir = "./checkpoints/serial"
+def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, optimizer, augmentation_pipeline1, augmentation_pipeline2, temperature, checkpoint_dir):
+    setup(rank, world_size)
+    device = torch.device(f'cuda:{rank}')
+    simclr_model.to(device)
+    simclr_model = DDP(simclr_model, device_ids=[rank])
 
-# Initialize TensorBoard writer
-writer = SummaryWriter(log_dir='./tb_logs/serial')
+    writer = SummaryWriter(log_dir=f'./tb_logs/serial_{rank}')
 
-# Attempt to load the latest checkpoint
-start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
+    simclr_model.train()
+    for epoch in range(start_epoch, epochs):
+        total_loss = 0
+        with tqdm(total=len(train_loader), desc=f'Epoch {epoch+1}/{epochs}', unit='batch') as pbar:
+            for batch_idx, (images, _, _) in enumerate(train_loader):
+                optimizer.zero_grad()
+                images_i = torch.stack([augmentation_pipeline1(img).to(device) for img in images])
+                images_j = torch.stack([augmentation_pipeline2(img).to(device) for img in images])
+                z_i = simclr_model(images_i)
+                z_j = simclr_model(images_j)
+                z = torch.cat((z_i, z_j), dim=0)
+                loss = nt_xent_loss(z, temperature)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+                writer.add_scalar('Loss/train', loss.item(), epoch * len(train_loader) + batch_idx)
+                pbar.set_postfix({'Loss': total_loss / (batch_idx + 1)})
+                pbar.update(1)
+                if batch_idx % 100 == 0:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'state_dict': simclr_model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                    }, epoch, base_dir=checkpoint_dir)
+    writer.close()
+    cleanup()
 
-simclr_model.train()
-
-for epoch in range(start_epoch, epochs):
-    total_loss = 0
-    for batch_idx, (images, _, _) in enumerate(train_loader):
-        optimizer.zero_grad()
-
-        images_i = torch.stack([augmentation_pipeline1(img).to(device) for img in images])
-        images_j = torch.stack([augmentation_pipeline2(img).to(device) for img in images])
-
-        z_i = simclr_model(images_i).to(device)
-        z_j = simclr_model(images_j).to(device)
-
-        z = torch.cat((z_i, z_j), dim=0)
-        loss = nt_xent_loss(z, temperature)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-        # Log loss to TensorBoard
-        writer.add_scalar('Loss/train', loss.item(), epoch * len(train_loader) + batch_idx)
-
-        if batch_idx % 100 == 0:
-            print(f'Epoch {epoch+1}, Batch {batch_idx+1}, Loss: {total_loss / (batch_idx + 1)}')
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': simclr_model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }, epoch, base_dir=checkpoint_dir)
-writer.close()
+if __name__ == "__main__":
+    checkpoint_dir = "./checkpoints/parallel"
+    train_loader, eval_loader = get_data_loaders()
+    base_model = torchvision.models.resnet50(pretrained=True)
+    simclr_model = SimCLREncoder(base_model, out_features=4)
+    optimizer = torch.optim.SGD(simclr_model.parameters(), lr=1e-3, momentum=0.8)
+    start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
+    temperature = 0.5
+    world_size = torch.cuda.device_count()
+    mp.spawn(train, args=(world_size, 50, start_epoch, train_loader, simclr_model, optimizer, get_simclr_augmentation_pipeline(), get_simclr_augmentation_pipeline(type=2), temperature, checkpoint_dir), nprocs=world_size, join=True)
