@@ -145,7 +145,7 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
 if __name__ == "__main__":
     checkpoint_dir = "./checkpoints/parallel_noPL"
     train_loader, eval_loader = get_data_loaders()
-    base_model = torchvision.models.resnet18(pretrained=True)
+    base_model = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
     simclr_model = SimCLREncoder(base_model, out_features=4)
     optimizer = torch.optim.SGD(simclr_model.parameters(), lr=1e-3, momentum=0.8)
     start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
