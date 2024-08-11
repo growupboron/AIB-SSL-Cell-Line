@@ -70,19 +70,19 @@ class SimCLREncoder(nn.Module):
 
 def get_simclr_augmentation_pipeline(input_size=256, type=1):
     return transforms.Compose([
-        transforms.ToPILImage(),
+        #transforms.ToPILImage(),
         transforms.RandomResizedCrop(size=input_size),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomGrayscale(p=0.2),
+        #transforms.RandomHorizontalFlip(),
+        #transforms.RandomGrayscale(p=0.2),
         transforms.ToTensor(),
     ]) if type == 1 else transforms.Compose([
         transforms.ToPILImage(),
         transforms.RandomRotation(degrees=180),
-        transforms.RandomVerticalFlip(),
+        #transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
     ])
 
-def save_checkpoint(state, epoch, base_dir="./checkpoints/serial", filename="checkpoint_{epoch}.pth.tar"):
+def save_checkpoint(state, epoch, base_dir="./checkpoints/parallel_noPL", filename="checkpoint_{epoch}.pth.tar"):
     os.makedirs(base_dir, exist_ok=True)
     filepath = os.path.join(base_dir, filename.format(epoch=epoch))
     torch.save(state, filepath)
@@ -113,7 +113,7 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
     simclr_model.to(device)
     simclr_model = DDP(simclr_model, device_ids=[rank])
 
-    writer = SummaryWriter(log_dir=f'./tb_logs/serial_{rank}')
+    writer = SummaryWriter(log_dir=f'./tb_logs/parallel_noPL_{rank}')
 
     simclr_model.train()
     for epoch in range(start_epoch, epochs):
@@ -143,7 +143,7 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
     cleanup()
 
 if __name__ == "__main__":
-    checkpoint_dir = "./checkpoints/parallel"
+    checkpoint_dir = "./checkpoints/parallel_noPL"
     train_loader, eval_loader = get_data_loaders()
     base_model = torchvision.models.resnet50(pretrained=True)
     simclr_model = SimCLREncoder(base_model, out_features=4)
