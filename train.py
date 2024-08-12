@@ -13,10 +13,14 @@ from dataset import RxRx1Dataset
 import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+from torch.distributed.elastic.multiprocessing.errors import record
+from torch.nn.modules.batchnorm import SyncBatchNorm
+
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '12345'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -24,17 +28,36 @@ def cleanup():
 
 def get_data_loaders():
     generator = torch.Generator().manual_seed(42)
-    dataset = RxRx1Dataset(metadata_csv='metadata.csv', root_dir='/work/cvcs_2023_group23/AIB/data/rxrx1_v1.0', transform=transforms.Compose([transforms.CenterCrop(256), transforms.ToTensor(), transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))]))
+    dataset = RxRx1Dataset(metadata_csv='metadata.csv', root_dir='/work/cvcs_2023_group23/AIB/data/rxrx1_v1.0', transform=transforms.Compose([transforms.CenterCrop(256), transforms.ToTensor()]))
     total_size = len(dataset)
     train_size = int(0.8 * total_size)
     val_size = int(0.1 * total_size)
     test_size = total_size - train_size - val_size
 
     train_set, val_set, test_set = random_split(dataset, [train_size, val_size, test_size], generator=generator)
-
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=256, shuffle=True, num_workers=4)
-    eval_loader = torch.utils.data.DataLoader(test_set, batch_size=256, shuffle=True, num_workers=4)
+    train_sampler, val_sampler, test_sampler = DistributedSampler(train_set), DistributedSampler(val_set), DistributedSampler(test_set)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=256, shuffle=False, sampler=train_sampler, num_workers=2, drop_last=True)
+    eval_loader = torch.utils.data.DataLoader(test_set, batch_size=256, shuffle=False, sampler=test_sampler, num_workers=2, drop_last=True)
     return train_loader, eval_loader
+
+""" def nt_xent_loss(x, temperature):
+    assert len(x.size()) == 2
+    device = dist.get_rank()
+    
+    # Cosine similarity
+    xcs = F.cosine_similarity(x[None,:,:], x[:,None,:], dim=-1)
+    
+    # Avoid in-place modification by creating a copy
+    xcs = xcs.clone()
+    xcs[torch.eye(x.size(0), device=xcs.device).bool()] = float("-inf")
+
+    # Ground truth labels
+    target = torch.arange(512).to(device)
+    target[0::2] += 1
+    target[1::2] -= 1
+
+    # Standard cross-entropy loss
+    return F.cross_entropy(xcs / temperature, target, reduction="mean") """
 
 def nt_xent_loss(z, tau=0.5):
     N = z.size(0) // 2
@@ -52,34 +75,38 @@ def nt_xent_loss(z, tau=0.5):
     loss = -torch.log(pos_probs + 1e-9).mean()
     return loss
 
+
 class SimCLREncoder(nn.Module):
     def __init__(self, base_model, out_features):
         super(SimCLREncoder, self).__init__()
         self.base = nn.Sequential(*list(base_model.children())[:-1])
         self.projection_head = nn.Sequential(
             nn.Linear(base_model.fc.in_features, 512),
-            nn.ReLU(),
+            nn.ReLU(inplace=False),
             nn.Linear(512, out_features)
         )
 
     def forward(self, x):
+        
         x = self.base(x)
         x = torch.flatten(x, 1)
         x = self.projection_head(x)
         return x
 
-def get_simclr_augmentation_pipeline(input_size=256, type=1):
+def get_simclr_augmentation_pipeline(input_size=256, tr_type=1):
     return transforms.Compose([
-        #transforms.ToPILImage(),
+        transforms.ToPILImage(),
         transforms.RandomResizedCrop(size=input_size),
         #transforms.RandomHorizontalFlip(),
         #transforms.RandomGrayscale(p=0.2),
         transforms.ToTensor(),
-    ]) if type == 1 else transforms.Compose([
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))
+    ]) if tr_type == 1 else transforms.Compose([
         transforms.ToPILImage(),
         transforms.RandomRotation(degrees=180),
         #transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))
     ])
 
 def save_checkpoint(state, epoch, base_dir="./checkpoints/parallel_noPL", filename="checkpoint_{epoch}.pth.tar"):
@@ -107,12 +134,10 @@ def load_checkpoint(checkpoint_dir, model, optimizer):
         print(f"Error loading checkpoint: {e}")
         return 0
 
-def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, optimizer, augmentation_pipeline1, augmentation_pipeline2, temperature, checkpoint_dir):
-    setup(rank, world_size)
+def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, optimizer, scheduler, augmentation_pipeline1, augmentation_pipeline2, temperature, checkpoint_dir):
+    
     device = torch.device(f'cuda:{rank}')
-    simclr_model.to(device)
-    simclr_model = DDP(simclr_model, device_ids=[rank])
-
+   
     writer = SummaryWriter(log_dir=f'./tb_logs/parallel_noPL_{rank}')
 
     simclr_model.train()
@@ -134,21 +159,54 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
                 pbar.set_postfix({'Loss': total_loss / (batch_idx + 1)})
                 pbar.update(1)
                 if batch_idx % 100 == 0:
-                    save_checkpoint({
-                        'epoch': epoch + 1,
-                        'state_dict': simclr_model.state_dict(),
-                        'optimizer': optimizer.state_dict(),
-                    }, epoch, base_dir=checkpoint_dir)
+                    print(f"Epoch: [{epoch}/{epochs}]\tBatch: {batch_idx+1}({round(100 * (batch_idx + 1)/256, 1)}%)\tLoss: {total_loss / (batch_idx + 1)}")
+                    if dist.get_rank() == 0:
+                        save_checkpoint({
+                            'epoch': epoch + 1,
+                            'state_dict': simclr_model.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                        }, epoch, base_dir=checkpoint_dir)
+                scheduler.step()
     writer.close()
     cleanup()
 
-if __name__ == "__main__":
+@record
+def main():
+    torch.backends.cudnn.deterministic = True
+    
     checkpoint_dir = "./checkpoints/parallel_noPL"
+    os.makedirs(name=checkpoint_dir, exist_ok=True)
+    #torch.autograd.set_detect_anomaly(True)
+    
+    
+    # Setting up multi-GPU
+    world_size = torch.cuda.device_count()
+    local_rank = int(os.environ["LOCAL_RANK"])
+    setup(rank=local_rank, world_size=world_size)
+    torch.cuda.set_device(local_rank)
+    
+    
+    # loading dataset
     train_loader, eval_loader = get_data_loaders()
+    
     base_model = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
     simclr_model = SimCLREncoder(base_model, out_features=4)
-    optimizer = torch.optim.SGD(simclr_model.parameters(), lr=1e-3, momentum=0.8)
+    simclr_model = SyncBatchNorm.convert_sync_batchnorm(simclr_model)
+    simclr_model.to(local_rank)
+    
+    torch.cuda.empty_cache()
+    
+    simclr_model = DDP(simclr_model, device_ids=[local_rank])
+    
+    
+    #optimizer = torch.optim.SGD(simclr_model.parameters(), lr=1e-3, momentum=0.8)
+    optimizer = torch.optim.Adamax(simclr_model.parameters(),lr=3e-4, weight_decay=0.01)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25, T_mult=1)
     start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
-    temperature = 0.5
-    world_size = torch.cuda.device_count()
-    mp.spawn(train, args=(world_size, 50, start_epoch, train_loader, simclr_model, optimizer, get_simclr_augmentation_pipeline(), get_simclr_augmentation_pipeline(type=2), temperature, checkpoint_dir), nprocs=world_size, join=True)
+    temperature = 0.4
+    augmentation_pipeline_1, augmentation_pipeline_2 = get_simclr_augmentation_pipeline(), get_simclr_augmentation_pipeline(tr_type=2)
+    train(local_rank, world_size, 50, start_epoch, train_loader, simclr_model, optimizer, scheduler, augmentation_pipeline_1, augmentation_pipeline_2, temperature, checkpoint_dir)
+    #mp.spawn(train, args=(world_size, 50, start_epoch, train_loader, simclr_model, optimizer, get_simclr_augmentation_pipeline(), get_simclr_augmentation_pipeline(tr_type=2), temperature, checkpoint_dir), nprocs=world_size, join=True)
+if __name__ == "__main__":
+    main()
