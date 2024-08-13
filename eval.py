@@ -21,7 +21,7 @@ def get_data_loaders():
     dataset = RxRx1Dataset(metadata_csv='metadata.csv', root_dir='/work/cvcs_2023_group23/AIB/data/rxrx1_v1.0', transform=transforms.Compose([
         transforms.CenterCrop(256),
         transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))
+        transforms.Normalize(mean=(0.0232, 0.0618, 0.0403), std=(0.0266, 0.0484, 0.0210))
     ]))
     total_size = len(dataset)
     train_size = int(0.8 * total_size)
@@ -35,15 +35,16 @@ def get_data_loaders():
     return train_loader, eval_loader
 
 # Function to extract features and labels
-def extract_features_and_labels(model, loader, device, verbose_every=500):
+def extract_features_and_labels(model, loader, device, verbose_every=75):
     print("Starting feature extraction...")
     model.eval()
     features = []
     labels = []
     with torch.no_grad():
-        for i, (images, label, _) in enumerate(loader):
+        for i, (images, coarse, fine_grained) in enumerate(loader):
             if i % verbose_every == 0:
                 print(f"Processing batch {i+1}/{len(loader)}...")
+            label = fine_grained
             images = images.to(device)
             output = model.base(images)
             output = torch.flatten(output, start_dim=1)
@@ -55,7 +56,7 @@ def extract_features_and_labels(model, loader, device, verbose_every=500):
     return features, labels
 
 # Function to perform PCA and t-SNE for visualization
-def plot_feature_space(features, labels):
+def plot_feature_space(features, labels, save_dir):
     pca = PCA(n_components=50)
     tsne = TSNE(n_components=2, random_state=42)
 
@@ -65,10 +66,15 @@ def plot_feature_space(features, labels):
     plt.figure(figsize=(10, 8))
     sns.scatterplot(x=features_tsne[:, 0], y=features_tsne[:, 1], hue=labels, palette="deep", legend="full", alpha=0.7)
     plt.title("t-SNE of Extracted Features")
-    plt.show()
+    
+    # Save the plot
+    os.makedirs(save_dir, exist_ok=True)
+    plot_path = os.path.join(save_dir, 'tsne_plot.png')
+    plt.savefig(plot_path)
+    plt.close()
 
 # Function to evaluate the model using Logistic Regression
-def evaluate_model(train_features, train_labels, test_features, test_labels):
+def evaluate_model(train_features, train_labels, test_features, test_labels, save_dir):
     classifier = LogisticRegression(multi_class="multinomial", max_iter=1000, verbose=1, n_jobs=-1)
     classifier.fit(train_features, train_labels)
     predictions = classifier.predict(test_features)
@@ -82,33 +88,41 @@ def evaluate_model(train_features, train_labels, test_features, test_labels):
     print(f"Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}")
     print("Classification Report:\n", report)
 
+    # Save the confusion matrix plot
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
-    plt.show()
+    
+    # Save the plot
+    plot_path = os.path.join(save_dir, 'confusion_matrix.png')
+    plt.savefig(plot_path)
+    plt.close()
 
 if __name__ == "__main__":
     checkpoint_dir = "./checkpoints/parallel_noPL"
+    results_dir = "./results"
+    
     train_loader, eval_loader = get_data_loaders()
 
     base_model = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
-    simclr_model = SimCLREncoder(base_model, out_features=4)
+    simclr_model = SimCLREncoder(base_model, out_features=1139)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     simclr_model = simclr_model.to(device)
-
-    start_epoch = load_checkpoint(checkpoint_dir, simclr_model)
+    
+    optimizer = torch.optim.Adamax(simclr_model.parameters(), lr=3e-4, weight_decay=0.01)
+    start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
 
     print(f"Starting feature extraction for train set")
     train_features, train_labels = extract_features_and_labels(simclr_model, train_loader, device)
 
     print(f"Starting feature extraction for test set")
-    test_features, test_labels = extract_features_and_labels(simclr_model, eval_loader, device)
+    test_features, test_labels = extract_features_and_labels(simclr_model, eval_loader, device, 10)
 
     print("Plotting feature space")
-    plot_feature_space(test_features.numpy(), test_labels.numpy())
+    plot_feature_space(test_features.numpy(), test_labels.numpy(), results_dir)
 
     print("Evaluating model performance")
-    evaluate_model(train_features.numpy(), train_labels.numpy(), test_features.numpy(), test_labels.numpy())
+    evaluate_model(train_features.numpy(), train_labels.numpy(), test_features.numpy(), test_labels.numpy(), results_dir)

@@ -1,7 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=all_usr_prod
 #SBATCH --account=ai4bio2023
-#SBATCH --time=05:00:00
+#SBATCH --time=08:00:00
+#SBATCH --job-name="fine-grained"
 #SBATCH --gres=gpu:3
 #SBATCH --ntasks-per-node=3   # Number of tasks (GPUs) per node
 #SBATCH --nodes=1             # Number of nodes requested
@@ -10,6 +11,8 @@
 #SBATCH --mail-user=274236@studenti.unimore.it
 #SBATCH --mail-type=ALL
 #SBATCH --constraint="gpu_A40_48G|gpu_RTXA5000_24G|gpu_RTX6000_24G"
+
+source AIB_env/bin/activate
 
 # Train model
 python -u -m torch.distributed.run \
