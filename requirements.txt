@@ -1,4 +1,4 @@
-numpy>=1.19.1
+numpy==1.24.3
 ogb>=1.2.6
 outdated>=0.2.0
 pandas>=1.1.0
@@ -8,6 +8,7 @@ pytz>=2020.4
     # torch-scatter>=2.0.5
     # torch-geometric>=2.0.1
 #torchvision==0.13.1+cu113
+#pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 tqdm>=4.53.0
 scikit-learn>=0.20.0
 scipy>=1.5.4
@@ -17,3 +18,5 @@ matplotlib
 seaborn
 tensorboard
 wilds
+albumentations
+diffdist

@@ -4,3 +4,4 @@ AIB_env_serial/
 data/
 checkpoints/
 simclr-pytorch/
+rxrx1_cells/
