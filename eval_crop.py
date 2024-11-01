@@ -16,9 +16,10 @@ from torch.nn.parallel.distributed import DistributedDataParallel
 from torch.utils.data import random_split
 import argparse
 import logging
-from train_crop import SimCLREncoder, load_checkpoint  # Ensure load_checkpoint is imported
+from train_crop import SimCLREncoder, load_checkpoint
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +33,6 @@ def get_data_loaders():
     basic_transform = A.Compose([
         A.Resize(height=256, width=256),
         A.Normalize(mean=(0.0232, 0.0618, 0.0403), std=(0.0266, 0.0484, 0.0210)),
-        # ToTensorV2()  # Removed as per dataset.py modifications
     ])
 
     dataset = RxRx1WildsCellDataset(
@@ -55,8 +55,7 @@ def get_data_loaders():
 
     # Create data loaders without DistributedSampler for simplicity
     train_loader = torch.utils.data.DataLoader(
-        train_set, 
-        #batch_size=256, 
+        train_set,
         batch_size=128, 
         shuffle=True, 
         num_workers=4, 
@@ -64,8 +63,7 @@ def get_data_loaders():
         drop_last=True
     )
     eval_loader = torch.utils.data.DataLoader(
-        test_set, 
-        #batch_size=256, 
+        test_set,
         batch_size=128, 
         shuffle=False, 
         num_workers=4, 
@@ -75,48 +73,54 @@ def get_data_loaders():
     return train_loader, eval_loader
 
 # Function to extract features and labels
-def extract_features_and_labels(model, loader, device, verbose_every=75):
-    logger.info("Starting feature extraction...")
+def extract_features_and_labels(model, loader, device, save_dir, split_name):
+    logger.info(f"Starting feature extraction for {split_name} set...")
     model.eval()
-    features = []
-    labels = []
+    os.makedirs(save_dir, exist_ok=True)
+
+    feature_list = []
+    label_list = []
+
     with torch.no_grad():
         for i, (images, coarse, fine_grained) in enumerate(loader):
-            if i % verbose_every == 0:
+            if i % 10 == 0:
                 logger.info(f"Processing batch {i+1}/{len(loader)}...")
-            
-            # Move labels to CPU
-            label = fine_grained.cpu()
-            
-            # Ensure images are on the correct device
-            images = images.to(device)  # Shape: [batch_size, num_img, C, H, W]
-            
+
+            # Move images to device
+            images = images.to(device)
             batch_size, num_img, C, H, W = images.shape
-            
-            # Reshape images to [batch_size * num_img, C, H, W]
             images = images.view(-1, C, H, W)
-            
+
             # Forward pass through the model's base
-            output = model.module.base(images)  # Shape: [batch_size * num_img, feature_dim, 1, 1]
-            
-            # Flatten the output
-            output = torch.flatten(output, start_dim=1)  # Shape: [batch_size * num_img, feature_dim]
-            
-            # Reshape to [batch_size, num_img, feature_dim]
-            output = output.view(batch_size, num_img, -1)  # Shape: [batch_size, num_img, feature_dim]
-            
-            # Aggregate features (e.g., average over num_img)
-            aggregated_features = output.mean(dim=1)  # Shape: [batch_size, feature_dim]
-            
-            # Append to the lists
-            features.append(aggregated_features.cpu())  # Move to CPU
-            labels.append(label)
-    
-    # Concatenate all features and labels
-    features = torch.cat(features, dim=0)  # Shape: [total_samples, feature_dim]
-    labels = torch.cat(labels, dim=0)      # Shape: [total_samples]
-    
-    logger.info("Feature extraction completed.")
+            output = model.module.base(images)
+            output = torch.flatten(output, start_dim=1)
+            output = output.view(batch_size, num_img, -1)
+            aggregated_features = output.mean(dim=1)
+
+            # Move to CPU and convert to NumPy
+            features_cpu = aggregated_features.cpu().numpy()
+            labels_cpu = fine_grained.cpu().numpy()
+
+            # Save features and labels to disk
+            np.save(os.path.join(save_dir, f'{split_name}_features_batch_{i}.npy'), features_cpu)
+            np.save(os.path.join(save_dir, f'{split_name}_labels_batch_{i}.npy'), labels_cpu)
+
+            # Optionally, clear cache
+            del images, output, aggregated_features, features_cpu, labels_cpu
+            torch.cuda.empty_cache()
+
+    logger.info(f"Feature extraction for {split_name} set completed.")
+
+def load_and_concatenate_features(save_dir, split_name):
+    feature_files = sorted([f for f in os.listdir(save_dir) if f.startswith(f'{split_name}_features_batch_')])
+    label_files = sorted([f for f in os.listdir(save_dir) if f.startswith(f'{split_name}_labels_batch_')])
+
+    features_list = [np.load(os.path.join(save_dir, f)) for f in feature_files]
+    labels_list = [np.load(os.path.join(save_dir, f)) for f in label_files]
+
+    features = np.concatenate(features_list, axis=0)
+    labels = np.concatenate(labels_list, axis=0)
+
     return features, labels
 
 # Function to perform PCA and t-SNE for visualization
@@ -174,7 +178,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     checkpoint_dir = "./checkpoints/crop"
-    results_dir = "./results/simclr"
+    results_dir = "./results/crop"
 
     # Initialize distributed processing
     dist.init_process_group(backend='nccl', init_method='env://')
@@ -194,16 +198,20 @@ if __name__ == "__main__":
     start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
 
     logger.info("Starting feature extraction for train set")
-    train_features, train_labels = extract_features_and_labels(simclr_model, train_loader, device)
+    extract_features_and_labels(simclr_model, train_loader, device, results_dir, 'train')
 
     logger.info("Starting feature extraction for test set")
-    test_features, test_labels = extract_features_and_labels(simclr_model, eval_loader, device, verbose_every=10)
+    extract_features_and_labels(simclr_model, eval_loader, device, results_dir, 'test')
+
+    # Load features from disk
+    train_features, train_labels = load_and_concatenate_features(results_dir, 'train')
+    test_features, test_labels = load_and_concatenate_features(results_dir, 'test')
 
     logger.info("Plotting feature space")
-    plot_feature_space(test_features.numpy(), test_labels.numpy(), results_dir)
+    plot_feature_space(test_features, test_labels, results_dir)
 
     logger.info(f"Evaluating model performance with {args.classifier} classifier")
-    evaluate_model(train_features.numpy(), train_labels.numpy(), test_features.numpy(), test_labels.numpy(), results_dir, args.classifier)
+    evaluate_model(train_features, train_labels, test_features, test_labels, results_dir, args.classifier)
 
     if dist.is_initialized():
         logger.info("Destroying distributed process group")

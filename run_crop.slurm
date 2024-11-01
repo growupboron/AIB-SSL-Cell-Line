@@ -47,6 +47,8 @@ MASTER_PORT_TRAIN=${MASTER_PORT_TRAIN:-$MASTER_PORT}
 # MASTER_PORT_LOSS_K5=${MASTER_PORT_LOSS_K5:-$(($MASTER_PORT + 4))}
 MASTER_PORT_EVAL=${MASTER_PORT_EVAL:-$(($MASTER_PORT + 5))}
 
+# echo "Testing Loss function"
+
 # # Test loss for K=2
 # echo "Starting loss test for K=2 with MASTER_PORT=${MASTER_PORT_LOSS_K2}"
 # torchrun --nproc_per_node=2 \
@@ -80,7 +82,7 @@ echo "Starting training with MASTER_PORT=${MASTER_PORT_TRAIN}"
 torchrun --nproc_per_node=2 \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT_TRAIN} \
-         train_crop.py >> logs/crop/train.log
+         train_crop.py #>> logs/crop/train.log
 
 # Eval model
 echo "Starting evaluation with MASTER_PORT=${MASTER_PORT_EVAL}"

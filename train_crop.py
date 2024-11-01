@@ -19,7 +19,6 @@ from torch.nn.modules.batchnorm import SyncBatchNorm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from loss_crop import *
-#from transforms import *
 import logging
 import sys
 
@@ -33,8 +32,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-#BATCH = 256
 
 BATCH = 128
 
@@ -65,7 +62,6 @@ def get_data_loaders():
         basic_transform = A.Compose([
             A.Resize(height=256, width=256),
             A.Normalize(mean=(0.0232, 0.0618, 0.0403), std=(0.0266, 0.0484, 0.0210)),
-            #ToTensorV2()
         ])
 
         # Initialize dataset with Albumentations transforms
@@ -175,31 +171,26 @@ def get_simclr_augmentation_pipeline(limit=5):
                 A.HorizontalFlip(p=0.5),
                 A.RandomBrightnessContrast(p=0.2),
                 A.Normalize(mean=(0.0233, 0.0623, 0.0407), std=(0.0267, 0.0481, 0.0209)),
-                #ToTensorV2()  # Removed
             ]),
             A.Compose([
                 A.VerticalFlip(p=0.5),
                 A.RandomGamma(p=0.2),
                 A.Normalize(mean=(0.0233, 0.0623, 0.0407), std=(0.0267, 0.0481, 0.0209)),
-                #ToTensorV2()  # Removed
             ]),
             A.Compose([
                 A.Rotate(limit=30, p=0.5), 
                 A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=0, p=0.5),
                 A.Normalize(mean=(0.0233, 0.0623, 0.0407), std=(0.0267, 0.0481, 0.0209)),
-                #ToTensorV2()  # Removed
             ]),
             A.Compose([
                 A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
                 A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.2),
                 A.Normalize(mean=(0.0233, 0.0623, 0.0407), std=(0.0267, 0.0481, 0.0209)),
-                #ToTensorV2()  # Removed
             ]),
             A.Compose([
                 A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.5),
                 A.ElasticTransform(alpha=1.0, sigma=50.0, p=0.5),
                 A.Normalize(mean=(0.0233, 0.0623, 0.0407), std=(0.0267, 0.0481, 0.0209)),
-                #ToTensorV2()  # Removed
             ]),
         ]
         logger.info(f"Created {len(augs)} augmentation pipelines")
@@ -248,6 +239,7 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
         logger.info(f"TensorBoard SummaryWriter initialized at './tb_logs/crop_{rank}'")
 
         K = len(augmentations)
+        logger.info(f"K is {K}")
         loss_fn = NTXent(tau=temperature, gpu=rank, multiplier=K, distributed=True)
         logger.debug("NT-Xent loss function initialized")
 
@@ -301,9 +293,8 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
                         logger.debug(f"Epoch {epoch+1}, Batch {batch_idx+1}: Loss={loss.item()}, Acc={acc.mean().item()}, MAP={_map.mean().item()}")
 
                         # Backward pass and optimization
-                        #loss.backward()
-                        with torch.autograd.detect_anomaly(): #for debug only
-                            loss.backward()
+                        loss.backward()
+
                         logger.debug(f"Epoch {epoch+1}, Batch {batch_idx+1}: Backward pass completed")
 
                         torch.nn.utils.clip_grad_norm_(simclr_model.parameters(), max_norm=1.0)
