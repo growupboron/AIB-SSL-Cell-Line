@@ -407,7 +407,7 @@ def main():
         train(
             rank=local_rank,
             world_size=dist.get_world_size(),
-            epochs=50,
+            epochs=150,
             start_epoch=start_epoch,
             train_loader=train_loader,
             simclr_model=simclr_model,
