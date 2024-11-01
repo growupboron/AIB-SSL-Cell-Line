@@ -4,6 +4,7 @@ AIB_env_serial/
 data/
 checkpoints/
 AIB_new/AIB/crop_runs/241101/run_1/checkpoints
+AIB_new/AIB/crop_runs/241101/run_2/checkpoints
 simclr-pytorch/
 rxrx1_cells/
 dataset_debug_rank_0.log

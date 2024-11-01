@@ -3,7 +3,7 @@
 #SBATCH --account=ai4bio2023
 #SBATCH --time=12:00:00
 #SBATCH --job-name="fine-grained"
-#SBATCH --gres=gpu:2               # Request 2 GPUs
+#SBATCH --gres=gpu:2                # Request 2 GPUs
 #SBATCH --ntasks-per-node=2         # Number of tasks (GPUs) per node
 #SBATCH --nodes=1                   # Request 1 node
 #SBATCH --cpus-per-task=4           # Number of CPU cores per task
@@ -82,7 +82,7 @@ echo "Starting training with MASTER_PORT=${MASTER_PORT_TRAIN}"
 torchrun --nproc_per_node=2 \
          --master_addr=${MASTER_ADDR} \
          --master_port=${MASTER_PORT_TRAIN} \
-         train_crop.py #>> logs/crop/train.log
+         train_crop.py >> logs/crop/train.log
 
 # Eval model
 echo "Starting evaluation with MASTER_PORT=${MASTER_PORT_EVAL}"
