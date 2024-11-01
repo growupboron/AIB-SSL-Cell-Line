@@ -268,6 +268,10 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
                         batch_size, num_img, C, H, W = imgs.shape
                         imgs = imgs.view(-1, C, H, W)  # Shape: [batch_size * num_img, C, H, W]
 
+                        # Ensure images are in [0, 255] range and uint8 type
+                        imgs = imgs * 255.0  # If imgs are in [0, 1] range
+                        imgs = imgs.to(torch.uint8)
+
                         # Apply augmentations
                         views = []
                         for i in range(K):
@@ -297,9 +301,9 @@ def train(rank, world_size, epochs, start_epoch, train_loader, simclr_model, opt
                         logger.debug(f"Epoch {epoch+1}, Batch {batch_idx+1}: Loss={loss.item()}, Acc={acc.mean().item()}, MAP={_map.mean().item()}")
 
                         # Backward pass and optimization
-                        loss.backward()
-                        # with torch.autograd.detect_anomaly(): #debug only
-                        #     loss.backward()
+                        #loss.backward()
+                        with torch.autograd.detect_anomaly(): #for debug only
+                            loss.backward()
                         logger.debug(f"Epoch {epoch+1}, Batch {batch_idx+1}: Backward pass completed")
 
                         torch.nn.utils.clip_grad_norm_(simclr_model.parameters(), max_norm=1.0)
