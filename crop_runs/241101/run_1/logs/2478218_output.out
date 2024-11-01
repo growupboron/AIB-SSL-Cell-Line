@@ -1,0 +1,6 @@
+Testing Loss function
+Starting loss test for K=2 with MASTER_PORT=30281
+Starting loss test for K=3 with MASTER_PORT=30282
+Starting loss test for K=4 with MASTER_PORT=30283
+Starting loss test for K=5 with MASTER_PORT=30284
+Starting training with MASTER_PORT=30280

@@ -1,0 +1,65 @@
+2024-11-01 09:53:35,853 - INFO - __main__ - Starting NTXent loss test with K=3, batch_size=128, feature_dim=256, tau=0.2
+2024-11-01 09:53:36,041 - INFO - __main__ - Starting NTXent loss test with K=3, batch_size=128, feature_dim=256, tau=0.2
+2024-11-01 09:53:36,197 - DEBUG - __main__ - Local rank obtained from environment: 0
+2024-11-01 09:53:36,200 - INFO - torch.distributed.distributed_c10d - Added key: store_based_barrier_key:1 to store for rank: 0
+2024-11-01 09:53:36,204 - DEBUG - __main__ - Local rank obtained from environment: 1
+2024-11-01 09:53:36,205 - INFO - torch.distributed.distributed_c10d - Added key: store_based_barrier_key:1 to store for rank: 1
+2024-11-01 09:53:36,205 - INFO - torch.distributed.distributed_c10d - Rank 1: Completed store-based barrier for key:store_based_barrier_key:1 with 2 nodes.
+2024-11-01 09:53:36,205 - INFO - __main__ - Distributed process group initialized on rank 1 with world_size=2
+2024-11-01 09:53:36,205 - DEBUG - __main__ - Initialized NTXent with tau=0.2, multiplier=3, distributed=True
+2024-11-01 09:53:36,205 - DEBUG - __main__ - NTXent loss module initialized
+2024-11-01 09:53:36,210 - INFO - torch.distributed.distributed_c10d - Rank 0: Completed store-based barrier for key:store_based_barrier_key:1 with 2 nodes.
+2024-11-01 09:53:36,210 - INFO - __main__ - Distributed process group initialized on rank 0 with world_size=2
+2024-11-01 09:53:36,211 - DEBUG - __main__ - Initialized NTXent with tau=0.2, multiplier=3, distributed=True
+2024-11-01 09:53:36,211 - DEBUG - __main__ - NTXent loss module initialized
+2024-11-01 09:53:38,036 - DEBUG - __main__ - Random feature vectors with known positives generated with shape torch.Size([384, 256]) on GPU 0
+2024-11-01 09:53:38,037 - DEBUG - __main__ - Forward pass started for NTXent loss
+2024-11-01 09:53:38,037 - DEBUG - __main__ - Input tensor shape: torch.Size([384, 256])
+2024-11-01 09:53:38,048 - DEBUG - __main__ - Normalized input tensor with tau=0.2
+2024-11-01 09:53:38,048 - DEBUG - __main__ - Distributed flag is True. Gathering tensors from all processes
+2024-11-01 09:53:38,060 - DEBUG - __main__ - Random feature vectors with known positives generated with shape torch.Size([384, 256]) on GPU 1
+2024-11-01 09:53:38,060 - DEBUG - __main__ - Forward pass started for NTXent loss
+2024-11-01 09:53:38,060 - DEBUG - __main__ - Input tensor shape: torch.Size([384, 256])
+2024-11-01 09:53:38,061 - DEBUG - __main__ - Normalized input tensor with tau=0.2
+2024-11-01 09:53:38,061 - DEBUG - __main__ - Distributed flag is True. Gathering tensors from all processes
+2024-11-01 09:53:38,254 - DEBUG - __main__ - All_gather and chunking completed
+2024-11-01 09:53:38,254 - DEBUG - __main__ - All_gather and chunking completed
+2024-11-01 09:53:38,256 - DEBUG - __main__ - Concatenated sorted tensors with new shape torch.Size([768, 256])
+2024-11-01 09:53:38,256 - DEBUG - __main__ - Concatenated sorted tensors with new shape torch.Size([768, 256])
+2024-11-01 09:53:39,885 - DEBUG - __main__ - Logits computed with shape torch.Size([768, 768])
+2024-11-01 09:53:39,896 - DEBUG - __main__ - Diagonal of logits set to LARGE_NUMBER to exclude self-comparisons
+2024-11-01 09:53:39,898 - DEBUG - __main__ - LogSoftmax applied to logits
+2024-11-01 09:53:39,921 - DEBUG - __main__ - Labels for positive pairs created with shape torch.Size([1536])
+2024-11-01 09:53:39,925 - DEBUG - __main__ - Loss calculated: 2.002554416656494
+2024-11-01 09:53:39,925 - DEBUG - __main__ - Calculating top-2 accuracy
+2024-11-01 09:53:39,929 - DEBUG - __main__ - Accuracy calculated with shape torch.Size([768])
+2024-11-01 09:53:39,930 - DEBUG - __main__ - Accuracy computed with mean: 0.3333333432674408
+2024-11-01 09:53:39,930 - DEBUG - __main__ - Calculating Mean Average Precision for top-2 predictions
+2024-11-01 09:53:39,933 - DEBUG - __main__ - Mean Average Precision calculated with value 0.75
+2024-11-01 09:53:39,933 - DEBUG - __main__ - Mean Average Precision computed with value: 0.75
+2024-11-01 09:53:39,933 - INFO - __main__ - NTXent loss computed: 2.0026
+2024-11-01 09:53:39,933 - INFO - __main__ - Accuracy: 0.3333
+2024-11-01 09:53:39,933 - INFO - __main__ - Mean Average Precision: 0.7500
+Testing NTXent Loss with K=3:
+Loss: 2.0026
+Accuracy: 0.3333
+Mean Average Precision: 0.7500
+----------------------------------------
+2024-11-01 09:53:39,933 - DEBUG - __main__ - Destroying distributed process group
+2024-11-01 09:53:39,940 - DEBUG - __main__ - Logits computed with shape torch.Size([768, 768])
+2024-11-01 09:53:39,943 - DEBUG - __main__ - Diagonal of logits set to LARGE_NUMBER to exclude self-comparisons
+2024-11-01 09:53:39,944 - DEBUG - __main__ - LogSoftmax applied to logits
+2024-11-01 09:53:39,946 - DEBUG - __main__ - Labels for positive pairs created with shape torch.Size([1536])
+2024-11-01 09:53:39,946 - DEBUG - __main__ - Loss calculated: 2.002554416656494
+2024-11-01 09:53:39,947 - DEBUG - __main__ - Calculating top-2 accuracy
+2024-11-01 09:53:39,947 - INFO - __main__ - Distributed process group destroyed
+2024-11-01 09:53:39,948 - DEBUG - __main__ - Accuracy calculated with shape torch.Size([768])
+2024-11-01 09:53:39,948 - DEBUG - __main__ - Accuracy computed with mean: 0.3333333432674408
+2024-11-01 09:53:39,948 - DEBUG - __main__ - Calculating Mean Average Precision for top-2 predictions
+2024-11-01 09:53:39,949 - DEBUG - __main__ - Mean Average Precision calculated with value 0.75
+2024-11-01 09:53:39,949 - DEBUG - __main__ - Mean Average Precision computed with value: 0.75
+2024-11-01 09:53:39,949 - INFO - __main__ - NTXent loss computed: 2.0026
+2024-11-01 09:53:39,949 - INFO - __main__ - Accuracy: 0.3333
+2024-11-01 09:53:39,950 - INFO - __main__ - Mean Average Precision: 0.7500
+2024-11-01 09:53:39,950 - DEBUG - __main__ - Destroying distributed process group
+2024-11-01 09:53:39,976 - INFO - __main__ - Distributed process group destroyed
