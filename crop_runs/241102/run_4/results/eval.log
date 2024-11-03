@@ -1,0 +1,118 @@
+2024-11-02 20:08:20,773 - INFO - __main__ - Evaluating model performance with logistic classifier
+2024-11-02 20:08:20,795 - INFO - __main__ - Evaluating model performance with logistic classifier
+2024-11-02 20:10:58,918 - INFO - __main__ - Test Accuracy: 0.2424
+2024-11-02 20:10:58,919 - INFO - __main__ - Precision: 0.2315, Recall: 0.2431, F1-score: 0.2232
+2024-11-02 20:10:58,964 - DEBUG - matplotlib.colorbar - locator: <matplotlib.ticker.AutoLocator object at 0x149390424d60>
+2024-11-02 20:10:59,146 - INFO - __main__ - Test Accuracy: 0.2424
+2024-11-02 20:10:59,146 - INFO - __main__ - Precision: 0.2315, Recall: 0.2431, F1-score: 0.2232
+2024-11-02 20:10:59,177 - DEBUG - matplotlib.colorbar - locator: <matplotlib.ticker.AutoLocator object at 0x15181ed24e50>
+2024-11-02 20:12:08,559 - INFO - __main__ - Destroying distributed process group
+2024-11-02 20:12:08,717 - INFO - __main__ - Destroying distributed process group
+RUNNING THE L-BFGS-B CODE
+
+           * * *
+
+Machine precision = 2.220D-16
+ N =        67716     M =           10
+
+At X0         0 variables are exactly at the bounds
+
+At iterate    0    f=  4.88280D+00    |proj g|=  2.57337D-02
+
+At iterate   50    f=  3.19703D+00    |proj g|=  7.83015D-03
+
+At iterate  100    f=  2.99522D+00    |proj g|=  6.75365D-03
+
+At iterate  150    f=  2.89832D+00    |proj g|=  4.37675D-03
+
+At iterate  200    f=  2.84802D+00    |proj g|=  3.55842D-03
+
+At iterate  250    f=  2.82120D+00    |proj g|=  3.60116D-03
+
+At iterate  300    f=  2.80477D+00    |proj g|=  2.03301D-03
+
+At iterate  350    f=  2.79574D+00    |proj g|=  1.77838D-03
+
+At iterate  400    f=  2.79107D+00    |proj g|=  9.68102D-04
+
+At iterate  450    f=  2.78860D+00    |proj g|=  8.01646D-04
+
+At iterate  500    f=  2.78722D+00    |proj g|=  5.11385D-04
+
+At iterate  550    f=  2.78645D+00    |proj g|=  5.31378D-04
+
+At iterate  600    f=  2.78603D+00    |proj g|=  2.85224D-04
+
+At iterate  650    f=  2.78580D+00    |proj g|=  1.80431D-04
+
+           * * *
+
+Tit   = total number of iterations
+Tnf   = total number of function evaluations
+Tnint = total number of segments explored during Cauchy searches
+Skip  = number of BFGS updates skipped
+Nact  = number of active bounds at final generalized Cauchy point
+Projg = norm of the final projected gradient
+F     = final function value
+
+           * * *
+
+   N    Tit     Tnf  Tnint  Skip  Nact     Projg        F
+67716    656    667      1     0     0   9.863D-05   2.786D+00
+  F =   2.7857754741900842     
+
+CONVERGENCE: NORM_OF_PROJECTED_GRADIENT_<=_PGTOL            
+RUNNING THE L-BFGS-B CODE
+
+           * * *
+
+Machine precision = 2.220D-16
+ N =        67716     M =           10
+
+At X0         0 variables are exactly at the bounds
+
+At iterate    0    f=  4.88280D+00    |proj g|=  2.57337D-02
+
+At iterate   50    f=  3.19703D+00    |proj g|=  7.83015D-03
+
+At iterate  100    f=  2.99522D+00    |proj g|=  6.75365D-03
+
+At iterate  150    f=  2.89832D+00    |proj g|=  4.37675D-03
+
+At iterate  200    f=  2.84802D+00    |proj g|=  3.55842D-03
+
+At iterate  250    f=  2.82120D+00    |proj g|=  3.60116D-03
+
+At iterate  300    f=  2.80477D+00    |proj g|=  2.03301D-03
+
+At iterate  350    f=  2.79574D+00    |proj g|=  1.77838D-03
+
+At iterate  400    f=  2.79107D+00    |proj g|=  9.68102D-04
+
+At iterate  450    f=  2.78860D+00    |proj g|=  8.01646D-04
+
+At iterate  500    f=  2.78722D+00    |proj g|=  5.11385D-04
+
+At iterate  550    f=  2.78645D+00    |proj g|=  5.31378D-04
+
+At iterate  600    f=  2.78603D+00    |proj g|=  2.85224D-04
+
+At iterate  650    f=  2.78580D+00    |proj g|=  1.80431D-04
+
+           * * *
+
+Tit   = total number of iterations
+Tnf   = total number of function evaluations
+Tnint = total number of segments explored during Cauchy searches
+Skip  = number of BFGS updates skipped
+Nact  = number of active bounds at final generalized Cauchy point
+Projg = norm of the final projected gradient
+F     = final function value
+
+           * * *
+
+   N    Tit     Tnf  Tnint  Skip  Nact     Projg        F
+67716    656    667      1     0     0   9.863D-05   2.786D+00
+  F =   2.7857754741900842     
+
+CONVERGENCE: NORM_OF_PROJECTED_GRADIENT_<=_PGTOL            
