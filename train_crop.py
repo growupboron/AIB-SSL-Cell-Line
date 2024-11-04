@@ -390,24 +390,24 @@ def main():
         logger.info("Model wrapped with DistributedDataParallel")
 
         # Initialize optimizer and scheduler
-        optimizer = torch.optim.AdamW(simclr_model.parameters(), lr=1e-3, weight_decay=0.01)
+        optimizer = torch.optim.AdamW(simclr_model.parameters(), lr=1e-4, weight_decay=0.005)
         logger.info("Optimizer (AdamW) initialized")
 
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25, T_mult=1)
         logger.info("Scheduler (CosineAnnealingWarmRestarts) initialized")
 
         # Load checkpoint if available
         start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
         logger.info(f"Starting training from epoch {start_epoch}")
 
-        temperature = 0.4
+        temperature = 0.2
         logger.debug(f"Temperature for NT-Xent loss set to {temperature}")
 
         # Start training
         train(
             rank=local_rank,
             world_size=dist.get_world_size(),
-            epochs=250,
+            epochs=100,
             start_epoch=start_epoch,
             train_loader=train_loader,
             simclr_model=simclr_model,
