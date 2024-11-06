@@ -25,6 +25,8 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+BATCH = 64
+
 # Function to get data loaders
 def get_data_loaders():
     generator = torch.Generator().manual_seed(42)
@@ -56,7 +58,7 @@ def get_data_loaders():
     # Create data loaders without DistributedSampler for simplicity
     train_loader = torch.utils.data.DataLoader(
         train_set,
-        batch_size=128, 
+        batch_size=BATCH, 
         shuffle=True, 
         num_workers=4, 
         pin_memory=True, 
@@ -64,7 +66,7 @@ def get_data_loaders():
     )
     eval_loader = torch.utils.data.DataLoader(
         test_set,
-        batch_size=128, 
+        batch_size=BATCH, 
         shuffle=False, 
         num_workers=4, 
         pin_memory=True, 
@@ -105,7 +107,7 @@ def extract_features_and_labels(model, loader, device, save_dir, split_name):
             np.save(os.path.join(save_dir, f'{split_name}_features_batch_{i}.npy'), features_cpu)
             np.save(os.path.join(save_dir, f'{split_name}_labels_batch_{i}.npy'), labels_cpu)
 
-            # Optionally, clear cache
+            # Clear cache
             del images, output, aggregated_features, features_cpu, labels_cpu
             torch.cuda.empty_cache()
 
