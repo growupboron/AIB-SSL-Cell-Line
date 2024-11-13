@@ -9,9 +9,10 @@ dataset_debug_rank_0.log
 dataset_debug_rank_1.log
 loss_functions_debug.log
 training_debug.log
-AIB_new/AIB/crop_runs/241101/run_1/checkpoints
-AIB_new/AIB/crop_runs/241101/run_2/checkpoints
-AIB_new/AIB/crop_runs/241101/run_3/checkpoints
-AIB_new/AIB/crop_runs/241102/run_4/checkpoints
-AIB_new/AIB/crop_runs/241103/run_1/checkpoints
-AIB_new/AIB/crop_runs/241105/run_1/checkpoints
+AIB_new/AIB/crop_runs/241101/ep1_run1/checkpoints
+AIB_new/AIB/crop_runs/241101/ep1_run2/checkpoints
+AIB_new/AIB/crop_runs/241101/ep1_run3/checkpoints
+AIB_new/AIB/crop_runs/241102/ep1_run4/checkpoints
+AIB_new/AIB/crop_runs/241103/ep2_run1/checkpoints
+AIB_new/AIB/crop_runs/241105/ep3_run1/checkpoints
+AIB_new/AIB/crop_runs/241107/ep3_run2/checkpoints

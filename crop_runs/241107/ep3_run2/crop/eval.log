@@ -1,0 +1,102 @@
+2024-11-12 06:38:47,021 - INFO - __main__ - Evaluating model performance with logistic classifier
+2024-11-12 06:38:47,168 - INFO - __main__ - Evaluating model performance with logistic classifier
+2024-11-12 06:41:07,552 - INFO - __main__ - Test Accuracy: 0.2143
+2024-11-12 06:41:07,552 - INFO - __main__ - Precision: 0.2079, Recall: 0.2146, F1-score: 0.1925
+2024-11-12 06:41:07,595 - DEBUG - matplotlib.colorbar - locator: <matplotlib.ticker.AutoLocator object at 0x1533130685b0>
+2024-11-12 06:41:08,610 - INFO - __main__ - Test Accuracy: 0.2143
+2024-11-12 06:41:08,610 - INFO - __main__ - Precision: 0.2079, Recall: 0.2146, F1-score: 0.1925
+2024-11-12 06:41:08,645 - DEBUG - matplotlib.colorbar - locator: <matplotlib.ticker.AutoLocator object at 0x14b11d837760>
+2024-11-12 06:42:25,227 - INFO - __main__ - Destroying distributed process group
+RUNNING THE L-BFGS-B CODE
+
+           * * *
+
+Machine precision = 2.220D-16
+ N =        67716     M =           10
+
+At X0         0 variables are exactly at the bounds
+
+At iterate    0    f=  4.88280D+00    |proj g|=  8.20339D-03
+
+At iterate   50    f=  3.20383D+00    |proj g|=  3.16547D-03
+
+At iterate  100    f=  3.08709D+00    |proj g|=  1.11909D-03
+
+At iterate  150    f=  3.04632D+00    |proj g|=  1.70954D-03
+
+At iterate  200    f=  3.03503D+00    |proj g|=  5.62203D-04
+
+At iterate  250    f=  3.03075D+00    |proj g|=  3.24555D-04
+
+At iterate  300    f=  3.02800D+00    |proj g|=  2.43120D-04
+
+At iterate  350    f=  3.02525D+00    |proj g|=  2.16697D-04
+
+At iterate  400    f=  3.02317D+00    |proj g|=  1.41493D-04
+
+At iterate  450    f=  3.02166D+00    |proj g|=  2.72961D-04
+
+           * * *
+
+Tit   = total number of iterations
+Tnf   = total number of function evaluations
+Tnint = total number of segments explored during Cauchy searches
+Skip  = number of BFGS updates skipped
+Nact  = number of active bounds at final generalized Cauchy point
+Projg = norm of the final projected gradient
+F     = final function value
+
+           * * *
+
+   N    Tit     Tnf  Tnint  Skip  Nact     Projg        F
+67716    466    476      1     0     0   9.186D-05   3.021D+00
+  F =   3.0213953852760111     
+
+CONVERGENCE: NORM_OF_PROJECTED_GRADIENT_<=_PGTOL            
+2024-11-12 06:42:27,836 - INFO - __main__ - Destroying distributed process group
+RUNNING THE L-BFGS-B CODE
+
+           * * *
+
+Machine precision = 2.220D-16
+ N =        67716     M =           10
+
+At X0         0 variables are exactly at the bounds
+
+At iterate    0    f=  4.88280D+00    |proj g|=  8.20339D-03
+
+At iterate   50    f=  3.20383D+00    |proj g|=  3.16547D-03
+
+At iterate  100    f=  3.08709D+00    |proj g|=  1.11909D-03
+
+At iterate  150    f=  3.04632D+00    |proj g|=  1.70954D-03
+
+At iterate  200    f=  3.03503D+00    |proj g|=  5.62203D-04
+
+At iterate  250    f=  3.03075D+00    |proj g|=  3.24555D-04
+
+At iterate  300    f=  3.02800D+00    |proj g|=  2.43120D-04
+
+At iterate  350    f=  3.02525D+00    |proj g|=  2.16697D-04
+
+At iterate  400    f=  3.02317D+00    |proj g|=  1.41493D-04
+
+At iterate  450    f=  3.02166D+00    |proj g|=  2.72961D-04
+
+           * * *
+
+Tit   = total number of iterations
+Tnf   = total number of function evaluations
+Tnint = total number of segments explored during Cauchy searches
+Skip  = number of BFGS updates skipped
+Nact  = number of active bounds at final generalized Cauchy point
+Projg = norm of the final projected gradient
+F     = final function value
+
+           * * *
+
+   N    Tit     Tnf  Tnint  Skip  Nact     Projg        F
+67716    466    476      1     0     0   9.186D-05   3.021D+00
+  F =   3.0213953852760111     
+
+CONVERGENCE: NORM_OF_PROJECTED_GRADIENT_<=_PGTOL            
