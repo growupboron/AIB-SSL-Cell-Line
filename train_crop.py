@@ -33,7 +33,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BATCH = 64
+BATCH = 128
 
 def setup():
     try:
@@ -365,7 +365,7 @@ def main():
         setup()
 
         # Create SimCLR augmentation pipelines
-        augmentations = get_simclr_augmentation_pipeline(limit=5)
+        augmentations = get_simclr_augmentation_pipeline(limit=3)
 
         # Loading dataset with Albumentations transforms
         logger.debug("Loading data loaders")
