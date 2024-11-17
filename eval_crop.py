@@ -25,7 +25,7 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BATCH = 128
+BATCH = 96
 
 # Function to get data loaders
 def get_data_loaders():
