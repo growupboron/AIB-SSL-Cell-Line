@@ -208,7 +208,7 @@ def save_checkpoint(state, epoch, base_dir="./checkpoints/crop", filename="check
     except Exception as e:
         logger.exception(f"Failed to save checkpoint for epoch {epoch}")
 
-def load_checkpoint(checkpoint_dir, model, optimizer):
+def load_checkpoint(checkpoint_dir, model, optimizer, dpp=True):
     logger.debug(f"Attempting to load checkpoint from directory: {checkpoint_dir}")
     try:
         checkpoints = [chkpt for chkpt in os.listdir(checkpoint_dir) if chkpt.endswith('.pth.tar')]
@@ -220,7 +220,21 @@ def load_checkpoint(checkpoint_dir, model, optimizer):
 
         logger.info(f"Loading checkpoint '{latest_checkpoint_path}'")
         checkpoint = torch.load(latest_checkpoint_path, map_location='cuda')
-        model.load_state_dict(checkpoint['state_dict'])
+        state_dict = checkpoint["state_dict"]
+        # model.load_state_dict(checkpoint['state_dict'])
+        if not dpp:
+            from collections import OrderedDict
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                # Remove the "module." prefix
+                if k.startswith("module."):
+                    new_k = k[len("module."):]
+                else:
+                    new_k = k
+                new_state_dict[new_k] = v
+
+            # Load the adjusted state_dict into your model
+            model.load_state_dict(new_state_dict, strict=True)
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch = checkpoint['epoch']
         logger.info(f"Loaded checkpoint '{latest_checkpoint_path}' (epoch {epoch})")

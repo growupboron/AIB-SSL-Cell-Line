@@ -20,3 +20,5 @@ AIB_new/AIB/crop_runs/241114/ep2_run2/checkpoints
 AIB_new/AIB/crop_runs/241115/ep2_run3/checkpoints
 AIB_new/AIB/crop_runs/241116/ep4_run1/checkpoints
 AIB_new/AIB/crop_runs/241117/ep4_run2/checkpoints
+logs/crop/
+results/crop/

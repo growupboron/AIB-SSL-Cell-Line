@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import torch
 import torchvision
 import torch.nn.functional as F
@@ -6,13 +7,11 @@ from dataset_crop import RxRx1WildsCellDataset
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import torch.distributed as dist
-from torch.nn.parallel.distributed import DistributedDataParallel
 from torch.utils.data import random_split
 import argparse
 import logging
@@ -20,12 +19,13 @@ from train_crop import SimCLREncoder, load_checkpoint
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import numpy as np
+import gc
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BATCH = 128
+BATCH = 32  # Reduced batch size
 
 # Function to get data loaders
 def get_data_loaders():
@@ -60,16 +60,16 @@ def get_data_loaders():
         train_set,
         batch_size=BATCH, 
         shuffle=True, 
-        num_workers=4, 
-        pin_memory=True, 
+        num_workers=2,  # Reduced num_workers
+        pin_memory=False,  # Disabled to save memory
         drop_last=True
     )
     eval_loader = torch.utils.data.DataLoader(
         test_set,
         batch_size=BATCH, 
         shuffle=False, 
-        num_workers=4, 
-        pin_memory=True, 
+        num_workers=2,  # Reduced num_workers
+        pin_memory=False,  # Disabled to save memory
         drop_last=True
     )
     return train_loader, eval_loader
@@ -80,32 +80,25 @@ def extract_features_and_labels(model, loader, device, save_dir, split_name):
     model.eval()
     os.makedirs(save_dir, exist_ok=True)
 
-    feature_list = []
-    label_list = []
-
     with torch.no_grad():
-<<<<<<< HEAD
-        for i, (images, coarse, fine_grained) in enumerate(loader):
-=======
-        #for i, (images, coarse, fine_grained) in enumerate(loader):
         for i, (images, fine_grained, experiment_plate_id) in enumerate(loader):
->>>>>>> 7b4fb26... last commit: sync
             if i % 10 == 0:
                 logger.info(f"Processing batch {i+1}/{len(loader)}...")
 
-            # Move images to device
-            images = images.to(device)
-            batch_size, num_img, C, H, W = images.shape
-            images = images.view(-1, C, H, W)
+            with torch.cuda.amp.autocast():
+                # Move images to device
+                images = images.to(device)
+                batch_size, num_img, C, H, W = images.shape
+                images = images.view(-1, C, H, W)
 
-            # Forward pass through the model's base
-            output = model.module.base(images)
-            output = torch.flatten(output, start_dim=1)
-            output = output.view(batch_size, num_img, -1)
-            aggregated_features = output.mean(dim=1)
+                # Forward pass through the model's base
+                output = model.base(images)  # Changed from model.module.base(images)
+                output = torch.flatten(output, start_dim=1)
+                output = output.view(batch_size, num_img, -1)
+                aggregated_features = output.mean(dim=1)
 
             # Move to CPU and convert to NumPy
-            features_cpu = aggregated_features.cpu().numpy()
+            features_cpu = aggregated_features.cpu().numpy().astype(np.float32)
             labels_cpu = fine_grained.cpu().numpy()
 
             # Save features and labels to disk
@@ -115,9 +108,11 @@ def extract_features_and_labels(model, loader, device, save_dir, split_name):
             # Clear cache
             del images, output, aggregated_features, features_cpu, labels_cpu
             torch.cuda.empty_cache()
+            gc.collect()
 
     logger.info(f"Feature extraction for {split_name} set completed.")
 
+# Function to load and concatenate features
 def load_and_concatenate_features(save_dir, split_name):
     feature_files = sorted([f for f in os.listdir(save_dir) if f.startswith(f'{split_name}_features_batch_')])
     label_files = sorted([f for f in os.listdir(save_dir) if f.startswith(f'{split_name}_labels_batch_')])
@@ -148,18 +143,54 @@ def plot_feature_space(features, labels, save_dir):
     plt.savefig(plot_path)
     plt.close()
 
-# Function to evaluate the model using the selected classifier
-def evaluate_model(train_features, train_labels, test_features, test_labels, save_dir, classifier_type):
+# Function to evaluate the model using incremental classifiers
+def evaluate_model_incremental(train_features_dir, train_labels_dir, test_features_dir, test_labels_dir, save_dir, classifier_type):
     if classifier_type == "logistic":
-        classifier = LogisticRegression(multi_class="multinomial", max_iter=1000, verbose=1, n_jobs=-1)
+        classifier = SGDClassifier(loss='log_loss', max_iter=500, tol=1e-3, n_jobs=-1)
+        # Initialize classes
+        train_label_files = sorted([f for f in os.listdir(train_labels_dir) if f.startswith('train_labels_batch_')])
+        all_classes = np.unique([label for f in train_label_files for label in np.load(os.path.join(train_labels_dir, f))])
+        #classifier.partial_fit([], [], classes=all_classes)
+        
+        # Incrementally fit the classifier
+        train_feature_files = sorted([f for f in os.listdir(train_features_dir) if f.startswith('train_features_batch_')])
+        train_label_files = sorted([f for f in os.listdir(train_labels_dir) if f.startswith('train_labels_batch_')])
+
+        for feat_file, label_file in zip(train_feature_files, train_label_files):
+            features = np.load(os.path.join(train_features_dir, feat_file))
+            labels = np.load(os.path.join(train_labels_dir, label_file))
+            logger.info(f"Shapes: features: {features.shape}\tlabels: {labels.shape}")
+            classifier.partial_fit(features, labels)
+            logger.info(f"Trained on {feat_file} and {label_file}")
+        
+        # Make predictions incrementally
+        predictions = []
+        test_labels = []
+        test_feature_files = sorted([f for f in os.listdir(test_features_dir) if f.startswith('test_features_batch_')])
+        test_label_files = sorted([f for f in os.listdir(test_labels_dir) if f.startswith('test_labels_batch_')])
+
+        for feat_file, label_file in zip(test_feature_files, test_label_files):
+            features = np.load(os.path.join(test_features_dir, feat_file))
+            labels = np.load(os.path.join(test_labels_dir, label_file))
+            preds = classifier.predict(features)
+            predictions.append(preds)
+            test_labels.append(labels)
+            logger.info(f"Predicted on {feat_file}")
+        
+        predictions = np.concatenate(predictions)
+        test_labels = np.concatenate(test_labels)
+
     elif classifier_type == "knn":
+        # For KNN, loading all data might still cause OOM. Consider using Faiss or another optimized library.
+        train_features, train_labels = load_and_concatenate_features(train_features_dir, 'train')
+        test_features, test_labels = load_and_concatenate_features(test_features_dir, 'test')
         classifier = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
+        classifier.fit(train_features, train_labels)
+        predictions = classifier.predict(test_features)
     else:
         raise ValueError(f"Unsupported classifier type: {classifier_type}")
 
-    classifier.fit(train_features, train_labels)
-    predictions = classifier.predict(test_features)
-
+    # Compute metrics
     accuracy = accuracy_score(test_labels, predictions)
     precision, recall, f1, _ = precision_recall_fscore_support(test_labels, predictions, average='macro')
     cm = confusion_matrix(test_labels, predictions)
@@ -174,7 +205,6 @@ def evaluate_model(train_features, train_labels, test_features, test_labels, sav
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
     
-    # Save the plot
     plot_path = os.path.join(save_dir, 'confusion_matrix.png')
     plt.savefig(plot_path)
     plt.close()
@@ -187,20 +217,15 @@ if __name__ == "__main__":
     checkpoint_dir = "./checkpoints/crop"
     results_dir = "./results/crop"
 
-    # Initialize distributed processing
-    dist.init_process_group(backend='nccl', init_method='env://')
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    torch.cuda.set_device(local_rank)
-    device = torch.device(f'cuda:{local_rank}')
+    # Set device to CUDA if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     train_loader, eval_loader = get_data_loaders()
 
     base_model = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
     simclr_model = SimCLREncoder(base_model, out_features=1139)
-    simclr_model = nn.SyncBatchNorm.convert_sync_batchnorm(simclr_model)
     simclr_model.to(device)
-    simclr_model = DistributedDataParallel(simclr_model, device_ids=[local_rank])
-
+    
     optimizer = torch.optim.AdamW(simclr_model.parameters(), lr=3e-4, weight_decay=0.01)
     start_epoch = load_checkpoint(checkpoint_dir, simclr_model, optimizer)
 
@@ -210,16 +235,16 @@ if __name__ == "__main__":
     logger.info("Starting feature extraction for test set")
     extract_features_and_labels(simclr_model, eval_loader, device, results_dir, 'test')
 
-    # Load features from disk
+    # Plotting feature space
     train_features, train_labels = load_and_concatenate_features(results_dir, 'train')
-    test_features, test_labels = load_and_concatenate_features(results_dir, 'test')
-
-    logger.info("Plotting feature space")
-    plot_feature_space(test_features, test_labels, results_dir)
+    plot_feature_space(train_features, train_labels, results_dir)
 
     logger.info(f"Evaluating model performance with {args.classifier} classifier")
-    evaluate_model(train_features, train_labels, test_features, test_labels, results_dir, args.classifier)
-
-    if dist.is_initialized():
-        logger.info("Destroying distributed process group")
-        dist.destroy_process_group()
+    evaluate_model_incremental(
+        train_features_dir=results_dir,
+        train_labels_dir=results_dir,
+        test_features_dir=results_dir,
+        test_labels_dir=results_dir,
+        save_dir=results_dir,
+        classifier_type=args.classifier
+    )

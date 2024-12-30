@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=ai4bio2023
-#SBATCH --time=12:00:00
+#SBATCH --time=04:00:00
 #SBATCH --job-name="fine-grained"
 #SBATCH --gres=gpu:2                # Request 2 GPUs
 #SBATCH --ntasks-per-node=2         # Number of tasks (GPUs) per node
@@ -78,11 +78,11 @@ MASTER_PORT_EVAL=${MASTER_PORT_EVAL:-$(($MASTER_PORT + 5))}
 #          loss_crop.py --K=5 >> logs/crop/loss_k5.log
 
 # Train model
-echo "Starting training with MASTER_PORT=${MASTER_PORT_TRAIN}"
-torchrun --nproc_per_node=2 \
-         --master_addr=${MASTER_ADDR} \
-         --master_port=${MASTER_PORT_TRAIN} \
-         train_crop.py >> logs/crop/train.log
+# echo "Starting training with MASTER_PORT=${MASTER_PORT_TRAIN}"
+# torchrun --nproc_per_node=2 \
+#          --master_addr=${MASTER_ADDR} \
+#          --master_port=${MASTER_PORT_TRAIN} \
+#          train_crop.py >> logs/crop/train.log
 
 # Eval model
 echo "Starting evaluation with MASTER_PORT=${MASTER_PORT_EVAL}"
